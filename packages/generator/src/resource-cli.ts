@@ -1,0 +1,125 @@
+#!/usr/bin/env node
+import { program } from 'commander';
+import { generateResource } from './resource-generators/resource-generator';
+import { analyzeEntity } from './resource-utils/entity-analyzer';
+import { findAndLoadConfig } from './shared-config/config-loader';
+import { parsePath, resolveOutputPath } from './resource-utils/path-resolver';
+import { DtoGeneratorConfig, defaultConfig } from './types/config.types';
+
+type CliOptions = {
+  entity: string;
+  dir?: string;
+  generateModule: boolean;
+  generateService: boolean;
+  generateController: boolean;
+  force: boolean;
+};
+
+
+/**
+ * Main function to generate Nestjs resource for a single entity
+ */
+async function generateSingleEntityResource(
+  config: DtoGeneratorConfig,
+  options: CliOptions,
+): Promise<void> {
+  try {
+    const { entity: entityPath, dir: dirPath } = options;
+    const entityTemplate = config.resources?.templates?.entity ?? defaultConfig.resources?.templates?.entity;
+
+    if (!entityTemplate) {
+      throw new Error('Entity template is not defined in configuration');
+    }
+
+    // 1. Analyze the entity to get its metadata
+    const entityInfo = await analyzeEntity(entityPath);
+
+    // 2. Parse paths to get dir and entityName for template substitution
+    const { dir, entityName } = parsePath(entityPath, dirPath, entityTemplate);
+
+    // Ensure entity name from path matches entity class name for consistency
+    if (entityName !== entityInfo.name) {
+        // console.warn(`⚠️  Warning: Entity file name '${entityName}' does not match class name '${entityInfo.name}'. Using class name '${entityInfo.name}'.`);
+    }
+    
+    // Use kebab-case for file naming to match NestJS convention
+    const finalEntityName = entityInfo.name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+
+
+    // 3. Resolve output paths for each file to be generated
+    const basePath = config.resources?.basePath ?? defaultConfig.resources?.basePath ?? process.cwd();
+    const controllerTemplate = config.resources?.templates?.controller ?? defaultConfig.resources?.templates?.controller;
+    const serviceTemplate = config.resources?.templates?.service ?? defaultConfig.resources?.templates?.service;
+    const moduleTemplate = config.resources?.templates?.module ?? defaultConfig.resources?.templates?.module;
+
+    if (!controllerTemplate || !serviceTemplate || !moduleTemplate) {
+        throw new Error('Resource templates are not fully defined in configuration');
+    }
+    
+    // Resolve paths with correct entity name replacement
+    const controllerPath = resolveOutputPath(basePath, controllerTemplate, dir, finalEntityName);
+    const servicePath = resolveOutputPath(basePath, serviceTemplate, dir, finalEntityName);
+    const modulePath = resolveOutputPath(basePath, moduleTemplate, dir, finalEntityName);
+
+    const outputPaths = {
+        controller: controllerPath,
+        service: servicePath,
+        module: modulePath,
+    };
+
+
+    // 4. Generate the resource
+    await generateResource(entityInfo, outputPaths, options);
+
+    console.log(`✅ Resource generated successfully for entity: ${entityInfo.name}`);
+
+  } catch (error) {
+    console.error(`❌ Error generating resource for ${options.entity}:`, error);
+    process.exit(1);
+  }
+}
+
+/**
+ * CLI entry point
+ */
+async function runCli(): Promise<void> {
+  program
+    .name('resource-generator')
+    .description('CLI tool to generate NestJS resource from MikroORM entities')
+    .version('0.0.1')
+    .requiredOption('-e, --entity <path>', 'Path to the entity file')
+    .option('--dir <path>', 'Relative directory for output files (used if -e does not match template)')
+    .option('--generate-module', 'Generate NestJS module', true)
+    .option('--generate-service', 'Generate NestJS service', true)
+    .option('--generate-controller', 'Generate NestJS controller', true)
+    .option('--force', 'Overwrite existing files', false)
+    .parse(process.argv);
+
+  const options = program.opts<CliOptions>();
+
+  // Load configuration
+  const config = await findAndLoadConfig() || new DtoGeneratorConfig({ input: '', output: '' });
+
+
+  console.log('🔍 Analyzing entity:', options.entity);
+  console.log('⚙️  Options:', {
+    dir: options.dir,
+    generateModule: options.generateModule,
+    generateService: options.generateService,
+    generateController: options.generateController,
+    force: options.force
+  });
+
+  // Create output directory if it doesn't exist
+  await generateSingleEntityResource(config, options);
+}
+
+// Run CLI if this file is executed directly
+if (require.main === module) {
+  runCli().catch(error => {
+    console.error('Fatal error:', error);
+    process.exit(1);
+  });
+}
+
+export { runCli, generateSingleEntityResource };

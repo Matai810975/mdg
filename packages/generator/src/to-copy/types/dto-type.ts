@@ -1,0 +1,1 @@
+export type DtoType = 'create' | 'update' | 'data' | 'findMany'

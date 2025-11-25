@@ -1,0 +1,13 @@
+import { Module } from '@nestjs/common';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { {{{entityName}}} } from '{{{entityImportPath}}}';
+import { {{{entityName}}}Service } from './{{{entityFileNameKebab}}}.service';
+import { {{{entityName}}}Controller } from './{{{entityFileNameKebab}}}.controller';
+
+@Module({
+  imports: [MikroOrmModule.forFeature([{{{entityName}}}])],
+  controllers: [{{{entityName}}}Controller],
+  providers: [{{{entityName}}}Service],
+  exports: [{{{entityName}}}Service],
+})
+export class {{{entityName}}}Module {}

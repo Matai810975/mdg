@@ -1,0 +1,50 @@
+import { Controller, Get, Post, Body, Param, NotFoundException } from '@nestjs/common';
+import { ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { {{{entityName}}}Service } from './{{{entityFileNameKebab}}}.service';
+import { {{{entityName}}}Dto } from '{{{dtoImportPath}}}';
+import { {{{entityName}}}CreateDto } from '{{{createDtoImportPath}}}';
+import { {{{entityName}}}UpdateDto } from '{{{updateDtoImportPath}}}';
+import { {{{entityName}}}FindManyDto } from '{{{findManyDtoImportPath}}}';
+import { {{{entityName}}}FindManyResponseDto } from '{{{findManyResponseDtoImportPath}}}';
+
+@Controller('{{{entityFileNameKebab}}}')
+export class {{{entityName}}}Controller {
+  constructor(private readonly {{{entityNameCamel}}}Service: {{{entityName}}}Service) {}
+
+  @Get(':id')
+  @ApiOkResponse({ type: {{{entityName}}}Dto })
+  @ApiNotFoundResponse({ description: 'Entity not found' })
+  async findOne(@Param('id') id: string): Promise<{{{entityName}}}Dto> {
+    const result = await this.{{{entityNameCamel}}}Service.findOne(+id);
+    if (!result) {
+      throw new NotFoundException('Entity not found');
+    }
+    return result;
+  }
+
+  @Post('findMany')
+  @ApiOkResponse({ type: {{{entityName}}}FindManyResponseDto })
+  async findMany(@Body() dto: {{{entityName}}}FindManyDto) {
+    return await this.{{{entityNameCamel}}}Service.findMany(dto);
+  }
+
+  @Post('create')
+  @ApiCreatedResponse({ type: {{{entityName}}}Dto })
+  async create(@Body() create{{{entityName}}}Dto: {{{entityName}}}CreateDto) {
+    return await this.{{{entityNameCamel}}}Service.create(create{{{entityName}}}Dto);
+  }
+
+  @Post('update')
+  @ApiOkResponse({ type: {{{entityName}}}Dto })
+  @ApiNotFoundResponse({ description: 'Entity not found' })
+  async update(@Body() update{{{entityName}}}Dto: {{{entityName}}}UpdateDto) {
+    return await this.{{{entityNameCamel}}}Service.update(update{{{entityName}}}Dto);
+  }
+
+  @Post('delete/:id')
+  @ApiOkResponse({ description: 'Entity deleted successfully' })
+  @ApiNotFoundResponse({ description: 'Entity not found' })
+  async remove(@Param('id') id: string) {
+    return this.{{{entityNameCamel}}}Service.remove(+id);
+  }
+}

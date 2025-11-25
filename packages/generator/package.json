@@ -1,0 +1,50 @@
+{
+  "name": "@mdg/mikro-dto-generator",
+  "version": "0.0.2",
+  "description": "CLI tool that generates NestJS DTOs from MikroORM entities",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src/to-copy",
+    "package.json",
+    "README.md"
+  ],
+  "bin": {
+    "generate-dto": "dist/cli.js",
+    "generate-resource": "dist/resource-cli.js"
+  },
+  "scripts": {
+    "prepare": "pnpm run build",
+    "build": "tsc -p tsconfig.build.json && pnpm run copy-templates",
+    "copy-templates": "node -e \"const fs = require('fs'); const path = require('path'); const mkdirp = (p) => fs.mkdirSync(p, { recursive: true }); const copyDir = (src, dest) => { mkdirp(dest); fs.readdirSync(src).forEach(f => fs.copyFileSync(path.join(src, f), path.join(dest, f))); }; copyDir('./src/templates', './dist/templates');\""
+  },
+  "keywords": [],
+  "author": "matai",
+  "license": "ISC",
+  "devDependencies": {
+    "@mikro-orm/nestjs": "^6.1.1",
+    "@nestjs/common": "^11.1.8",
+    "@nestjs/core": "^11.1.8",
+    "@nestjs/swagger": "^11.2.1",
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@mikro-orm/core": "^6.5.9",
+    "@mikro-orm/postgresql": "^6.5.9",
+    "@types/inquirer": "^9.0.9",
+    "commander": "^14.0.2",
+    "handlebars": "^4.7.8",
+    "inquirer": "^12.11.1",
+    "pg": "^8.16.3",
+    "ts-morph": "^27.0.2",
+    "ts-node": "^10.9.2"
+  }
+}

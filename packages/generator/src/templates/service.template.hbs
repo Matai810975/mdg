@@ -1,0 +1,57 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@mikro-orm/nestjs';
+import { EntityRepository, EntityManager } from '@mikro-orm/core';
+import { {{{entityName}}} } from '{{{entityImportPath}}}';
+import { {{{entityName}}}Dto } from '{{{dtoImportPathFull}}}';
+import { {{{entityName}}}CreateDto } from '{{{createDtoImportPathFull}}}';
+import { {{{entityName}}}UpdateDto } from '{{{updateDtoImportPathFull}}}';
+import { {{{entityName}}}ToDto } from '{{{dtoImportPath}}}.mapping';
+import { create{{{entityName}}}FromDto } from '{{{createDtoImportPath}}}.create.mapping';
+import { update{{{entityName}}}FromDto } from '{{{updateDtoImportPath}}}.update.mapping';
+import { {{{entityName}}}FindManyDtoToFilter } from '{{{createDtoImportPath}}}.find-many.mapping';
+import { {{{entityName}}}FindManyDto } from '{{{findManyDtoImportPath}}}';
+import { {{{entityName}}}FindManyResponseDto } from '{{{findManyResponseDtoImportPath}}}';
+
+@Injectable()
+export class {{{entityName}}}Service {
+  constructor(
+    private readonly em: EntityManager,
+    @InjectRepository({{{entityName}}})
+    private readonly {{{entityNameCamel}}}Repository: EntityRepository<{{{entityName}}}>,
+  ) {}
+
+  async findOne({{{primaryKey}}}: {{{primaryKeyType}}}): Promise<{{{entityName}}}Dto | null> {
+    const entity = await this.{{{entityNameCamel}}}Repository.findOne({ {{{primaryKey}}}: {{{primaryKey}}} });
+    if (!entity) {
+      return null;
+    }
+    return {{{entityName}}}ToDto(entity);
+  }
+
+  async findMany(dto:{{{entityName}}}FindManyDto): Promise<{{{entityName}}}FindManyResponseDto>{
+    const [data,count] = await this.{{{entityNameCamel}}}Repository.findAndCount({{{entityName}}}FindManyDtoToFilter(dto))
+    return { data:data.map({{{entityName}}}ToDto), count }
+  }
+
+  async create(create{{{entityName}}}Dto: {{{entityName}}}CreateDto): Promise<{{{entityName}}}Dto> {
+    const {{{entityNameCamel}}} = create{{{entityName}}}FromDto(create{{{entityName}}}Dto, this.em);
+    await this.em.persistAndFlush({{{entityNameCamel}}});
+    return {{{entityName}}}ToDto({{{entityNameCamel}}});
+  }
+
+  async update(update{{{entityName}}}Dto: {{{entityName}}}UpdateDto): Promise<{{{entityName}}}Dto> {
+    // Use the update mapping function
+    const {{{entityNameCamel}}} = await update{{{entityName}}}FromDto(update{{{entityName}}}Dto, this.em);
+    await this.em.flush();
+    return {{{entityName}}}ToDto({{{entityNameCamel}}});
+  }
+
+  async remove({{{primaryKey}}}: {{{primaryKeyType}}}): Promise<void> {
+    const {{{entityNameCamel}}} = await this.{{{entityNameCamel}}}Repository.findOne({ {{{primaryKey}}}: {{{primaryKey}}} });
+    if (!{{{entityNameCamel}}}) {
+      throw new Error('{{{entityName}}} not found');
+    }
+
+    await this.em.removeAndFlush({{{entityNameCamel}}});
+  }
+}

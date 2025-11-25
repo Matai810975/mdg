@@ -1,0 +1,578 @@
+#!/usr/bin/env node
+import { program } from "commander";
+import { runInteractiveMode } from "./interactive-cli";
+import { Project } from "ts-morph";
+import fs from "fs";
+import path from "path";
+import { generateDtoFiles } from "./generators/data-dto-generator";
+import { generateMappingFiles } from "./generators/entity-to-dto-generator";
+import { generateCreateDtoFiles } from "./generators/create-dto-generator";
+import { generateUpdateDtoFiles } from "./generators/update-dto-generator";
+import { generateFindManyDtoFiles } from "./generators/find-many-dto-generator";
+import { generateFindManyResponseDtoFiles } from "./generators/find-many-response-dto-generator";
+import { generateFindManyToFilterMappingFiles } from "./generators/find-many-to-filter-generator";
+import { generateCreateDtoToEntityMappingFiles } from "./generators/create-dto-to-entity-generator";
+import { generateUpdateDtoToEntityMappingFiles } from "./generators/update-dto-to-entity-generator";
+import { generateDtosInParallel } from "./parallel-dto-generator";
+import { DtoGeneratorError } from "./errors/DtoGeneratorError";
+import { logError } from "./errors/error-utils";
+import {
+  DtoGeneratorConfig,
+  LegacyGeneratorOptions,
+  legacyToConfig,
+} from "./types/config.types";
+import { loadAndMergeConfig } from "./utils/config-merger";
+import { loadConfigFile, validateConfig } from "./utils/config-loader";
+
+/**
+ * Load configuration with support for specific config file path
+ */
+async function loadConfiguration(options: any): Promise<DtoGeneratorConfig> {
+  let config: DtoGeneratorConfig | null = null;
+
+  if (options.config) {
+    // Load specific configuration file
+    config = await loadConfigFile(options.config);
+    console.log(`✓ Loaded configuration from: ${options.config}`);
+  } else {
+    // Auto-detect configuration file
+    config = await loadAndMergeConfig(options as LegacyGeneratorOptions);
+    if (config) {
+      console.log("✓ Using configuration file as defaults");
+    }
+  }
+
+  if (!config) {
+    console.log("⚠️  No configuration file found, using CLI options only");
+    console.log(
+      "💡 Create a mikro-dto-generator.config.ts file for default settings"
+    );
+
+    // Validate required options
+    if (!options.input || !options.output) {
+      console.error(
+        "Error: Please provide both input pattern and output paths."
+      );
+      console.error(
+        "Example: mikro-dto-generator --input 'src/entities/*.entity.ts' --output './dtos'"
+      );
+      console.error(
+        "Or create a mikro-dto-generator.config.ts file with default settings."
+      );
+      process.exit(1);
+    }
+    config = legacyToConfig(options as LegacyGeneratorOptions);
+  }
+
+  // Show what CLI options are overriding
+  if (options.config && config) {
+    const overrides = [];
+    if (options.input && options.input !== config.input)
+      overrides.push(`input: ${config.input} → ${options.input}`);
+    if (options.output && options.output !== config.output)
+      overrides.push(`output: ${config.output} → ${options.output}`);
+
+    if (overrides.length > 0) {
+      console.log("✓ CLI option overrides:", overrides.join(", "));
+    }
+  }
+
+  return config;
+}
+
+/**
+ * Validate configuration file
+ */
+async function validateConfigMode(configPath?: string): Promise<void> {
+  try {
+    let config;
+
+    if (configPath) {
+      config = await loadConfigFile(configPath);
+      console.log(`✓ Loaded configuration from: ${configPath}`);
+    } else {
+      const { findAndLoadConfig } = await import("./utils/config-loader");
+      config = await findAndLoadConfig();
+      if (!config) {
+        console.error("❌ No configuration file found");
+        process.exit(1);
+      }
+      console.log("✓ Found and loaded configuration file");
+    }
+
+    validateConfig(config);
+    console.log("✅ Configuration is valid!");
+
+    console.log("");
+    console.log("📋 Configuration Summary:");
+    console.log(`  Input: ${config.input}`);
+    console.log(`  Output: ${config.output}`);
+    console.log(`  Generators: ${config.generators.join(", ")}`);
+    if (config.parallel) {
+      console.log(
+        `  Parallel: enabled (concurrency: ${config.concurrency || 4})`
+      );
+    } else {
+      console.log(`  Parallel: disabled`);
+    }
+  } catch (error) {
+    console.error("❌ Configuration validation failed:");
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+/**
+ * Main function that can be imported as a module
+ * @param options Generator options
+ */
+export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
+  if (!options.input || !options.output) {
+    throw new Error(
+      "Error: Please provide both input pattern and output paths."
+    );
+  }
+
+  try {
+    const project = new Project({
+      tsConfigFilePath: "./tsconfig.json", // Load the tsconfig.json to properly resolve baseUrl
+      skipAddingFilesFromTsConfig: true, // Skip automatically adding files from tsconfig include patterns
+    });
+    // Support different entity file selection patterns
+    // If the input already contains a glob pattern, use it directly
+    // Otherwise, default to the original behavior
+    const entityPattern = options.input;
+
+    project.addSourceFilesAtPaths(entityPattern);
+
+    // Automatically resolve and add imported entity files
+    // This ensures that when processing a single entity file, referenced entities are also loaded
+    const initialSourceFiles = project.getSourceFiles();
+
+    // For each loaded file, get its imports and add referenced entity files
+    for (const sourceFile of initialSourceFiles) {
+      const imports = sourceFile.getImportDeclarations();
+      for (const imp of imports) {
+        const moduleSpecifier = imp.getModuleSpecifierValue();
+        // Check if this is a local import (relative or baseUrl-based)
+        if (
+          moduleSpecifier.startsWith("./") ||
+          moduleSpecifier.startsWith("../") ||
+          moduleSpecifier.startsWith("src/")
+        ) {
+          try {
+            // Resolve the import relative to the original source file's directory
+            const sourceFileDir = path.dirname(sourceFile.getFilePath());
+            let resolvedPath: string;
+            if (
+              moduleSpecifier.startsWith("./") ||
+              moduleSpecifier.startsWith("../")
+            ) {
+              // For relative paths, resolve relative to source file
+              resolvedPath = path.resolve(sourceFileDir, moduleSpecifier);
+              if (!resolvedPath.endsWith(".ts")) {
+                resolvedPath += ".ts"; // Add .ts extension if not present
+              }
+            } else {
+              // For baseUrl imports (like 'src/test/base-entity'), resolve relative to project root
+              resolvedPath = path.join(process.cwd(), moduleSpecifier);
+              if (!resolvedPath.endsWith(".ts")) {
+                resolvedPath += ".ts"; // Add .ts extension if not present
+              }
+            }
+
+            // Add the resolved file to the project
+            if (fs.existsSync(resolvedPath)) {
+              project.addSourceFileAtPath(resolvedPath);
+            }
+          } catch (e) {
+            // Ignore errors for files that can't be resolved
+          }
+        }
+      }
+    }
+
+    const sourceFiles = project.getSourceFiles();
+
+    // Check if we should use parallel processing
+    const shouldUseParallel =
+      options.parallel &&
+      options.generators.some((gen) =>
+        ["dto", "create-dto", "update-dto", "find-many-dto"].includes(gen)
+      );
+
+    if (shouldUseParallel) {
+      const parallelOptions = {
+        generateDto: options.generators.includes("dto"),
+        generateCreateDto: options.generators.includes("create-dto"),
+        generateUpdateDto: options.generators.includes("update-dto"),
+        generateFindManyDto: options.generators.includes("find-many-dto"),
+        concurrencyLimit: options.concurrency,
+      };
+
+      await generateDtosInParallel(
+        {
+          project,
+          sourceFiles,
+          outputPath: options.output,
+        },
+        parallelOptions
+      );
+    }
+
+    // Process each generator type
+    for (const generator of options.generators) {
+      try {
+        switch (generator) {
+          case "dto":
+            if (!shouldUseParallel) {
+              generateDtoFiles({
+                project,
+                sourceFiles,
+                outputPath: options.output,
+              });
+            }
+            break;
+
+          case "create-dto":
+            if (!shouldUseParallel) {
+              generateCreateDtoFiles({
+                project,
+                sourceFiles,
+                outputPath: options.output,
+              });
+            }
+            break;
+
+          case "update-dto":
+            if (!shouldUseParallel) {
+              generateUpdateDtoFiles({
+                project,
+                sourceFiles,
+                outputPath: options.output,
+              });
+            }
+            break;
+
+          case "find-many-dto":
+            if (!shouldUseParallel) {
+              generateFindManyDtoFiles({
+                project,
+                sourceFiles,
+                outputPath: options.output,
+              });
+            }
+            break;
+
+          case "find-many-response-dto":
+            generateFindManyResponseDtoFiles({
+              project,
+              sourceFiles,
+              outputPath: options.output,
+            });
+            break;
+
+          case "find-many-to-filter":
+            generateFindManyToFilterMappingFiles({
+              project,
+              sourceFiles,
+              outputPath: options.output,
+            });
+            break;
+
+          case "entity-to-dto":
+            generateMappingFiles({
+              project,
+              sourceFiles,
+              outputPath: options.output,
+            });
+            break;
+
+          case "create-dto-to-entity":
+            generateCreateDtoToEntityMappingFiles({
+              project,
+              sourceFiles,
+              outputPath: options.output,
+            });
+            break;
+
+          case "update-dto-to-entity":
+            generateUpdateDtoToEntityMappingFiles({
+              project,
+              sourceFiles,
+              outputPath: options.output,
+            });
+            break;
+
+          default:
+            throw new DtoGeneratorError(
+              `Unknown generator type: ${generator}`,
+              "UNKNOWN_GENERATOR",
+              { generatorType: generator }
+            );
+        }
+      } catch (error) {
+        if (error instanceof DtoGeneratorError) {
+          logError(error, {
+            operation: `generate-${generator}`,
+            filePath: options.output,
+          });
+          throw error;
+        }
+        throw error;
+      }
+    }
+
+    // Copy the to-copy directory contents to the output directory only if any DTO generators are enabled
+    const hasDtoGenerators = options.generators.some((gen) =>
+      [
+        "dto",
+        "create-dto",
+        "update-dto",
+        "find-many-dto",
+        "find-many-response-dto",
+        "find-many-to-filter",
+      ].includes(gen)
+    );
+
+    if (hasDtoGenerators) {
+      try {
+        copyToCopyDirectory(options.output);
+      } catch (error) {
+        if (error instanceof DtoGeneratorError) {
+          logError(error, {
+            operation: "copy-to-copy-directory",
+            filePath: options.output,
+          });
+          throw error;
+        }
+        throw error;
+      }
+    }
+
+    await project.save();
+  } catch (error) {
+    if (error instanceof DtoGeneratorError) {
+      logError(error, { operation: "generate-dtos", filePath: options.output });
+      throw error;
+    } else if (error instanceof Error) {
+      const wrappedError = new DtoGeneratorError(
+        `Unexpected error during DTO generation: ${error.message}`,
+        "UNEXPECTED_ERROR",
+        { operation: "generate-dtos", filePath: options.output }
+      );
+      logError(wrappedError, {
+        operation: "generate-dtos",
+        filePath: options.output,
+      });
+      throw wrappedError;
+    } else {
+      const wrappedError = new DtoGeneratorError(
+        `Unexpected error during DTO generation: ${String(error)}`,
+        "UNEXPECTED_ERROR",
+        { operation: "generate-dtos", filePath: options.output }
+      );
+      logError(wrappedError, {
+        operation: "generate-dtos",
+        filePath: options.output,
+      });
+      throw wrappedError;
+    }
+  }
+}
+
+/**
+ * Copy the contents of the to-copy directory to the output directory
+ * @param outputPath The output directory path
+ */
+function copyToCopyDirectory(outputPath: string): void {
+  // Get the root directory of the package (two levels up from src/index.ts)
+  const packageRoot = path.join(__dirname, "..");
+
+  // For the built version, the to-copy directory is in dist/to-copy
+  // For the dev version, we check both dist and src locations
+  const toCopyDirBuilt = path.join(packageRoot, "dist", "to-copy");
+  const toCopyDirSrc = path.join(packageRoot, "src", "to-copy");
+
+  // Use the built version if it exists, otherwise fall back to src (for development)
+  const toCopyDir = fs.existsSync(toCopyDirBuilt)
+    ? toCopyDirBuilt
+    : toCopyDirSrc;
+
+  if (fs.existsSync(toCopyDir)) {
+    copyDirectory(toCopyDir, outputPath);
+  }
+}
+
+/**
+ * Recursively copy a directory
+ * @param src Source directory
+ * @param dest Destination directory
+ */
+function copyDirectory(src: string, dest: string): void {
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+
+  // Create destination directory if it doesn't exist
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      copyDirectory(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+// CLI entry point
+if (require.main === module) {
+  const start = new Date();
+  program
+    .version("0.0.1")
+    .description("A CLI tool to generate NestJS DTOs from MikroORM entities.")
+    .option(
+      "-i, --input <pattern>",
+      "Path or glob pattern to the MikroORM entities (e.g., 'src/entities/*.ts', 'src/models/**/*.ts')"
+    )
+    .option("-o, --output <path>", "Path to the output directory for DTOs")
+    .option("--generate-dto", "Generate DTO files", false)
+    .option("--generate-create-dto", "Generate Create DTO files", false)
+    .option("--generate-update-dto", "Generate Update DTO files", false)
+    .option("--generate-find-many-dto", "Generate FindMany DTO files", false)
+    .option(
+      "--generate-find-many-response-dto",
+      "Generate FindManyResponse DTO files",
+      false
+    )
+    .option(
+      "--generate-find-many-to-filter",
+      "Generate FindMany DTO to filter mapping functions",
+      false
+    )
+    .option("--generate-mapping", "Generate mapping functions", false)
+    .option(
+      "--generate-create-dto-to-entity",
+      "Generate create DTO to entity mapping functions",
+      false
+    )
+    .option(
+      "--generate-update-dto-to-entity",
+      "Generate update DTO to entity mapping functions",
+      false
+    )
+    .option(
+      "--parallel",
+      "Enable parallel processing for faster generation",
+      false
+    )
+    .option(
+      "--concurrency <number>",
+      "Set the number of concurrent workers for parallel processing",
+      "4"
+    )
+    .option(
+      "--interactive",
+      "Run in interactive mode with guided prompts",
+      false
+    )
+    .option("--skip-config", "Skip loading configuration file")
+    .option("-c, --config <path>", "Path to a specific configuration file")
+    .option(
+      "--validate",
+      "Only validate the configuration file without generating DTOs",
+      false
+    )
+    .parse(process.argv);
+
+  const options = program.opts();
+  // Handle validation mode
+  if (options.validate) {
+    validateConfigMode(options.config).catch((error) => {
+      console.error("Configuration validation failed:", error);
+      process.exit(1);
+    });
+  } else {
+    // Check if interactive mode is requested
+    if (options.interactive) {
+      runInteractiveMode().catch((error) => {
+        console.error("Interactive mode failed:", error);
+        process.exit(1);
+      });
+    } else {
+      // Load configuration file as default (unless explicitly disabled)
+      const shouldLoadConfig = !options.skipConfig;
+      if (shouldLoadConfig) {
+        loadConfiguration(options)
+          .then((config) => {
+            return generateDtos(config!);
+          })
+          .then(() => {
+            const end = new Date();
+            console.log(
+              `start:${start},end:${end},total:${
+                end.getTime() - start.getTime()
+              }`
+            );
+          })
+          .catch((error) => {
+            if (error instanceof DtoGeneratorError) {
+              // Error already logged by generateDtos function
+              console.error(`\n[ERROR] ${error.message}`);
+              if (error.context && Object.keys(error.context).length > 0) {
+                console.error(
+                  `Context: ${JSON.stringify(error.context, null, 2)}`
+                );
+              }
+            } else {
+              console.error(`\n[ERROR] ${error.message || error}`);
+            }
+            process.exit(1);
+          });
+      } else {
+        // Skip config loading, use CLI options only
+        console.log("⚠️  Skipping configuration file loading");
+
+        // Validate required options
+        if (!options.input || !options.output) {
+          console.error(
+            "Error: Please provide both input pattern and output paths."
+          );
+          console.error(
+            "Example: mikro-dto-generator --input 'src/entities/*.entity.ts' --output './dtos'"
+          );
+          process.exit(1);
+        }
+
+        const finalConfig = legacyToConfig(options as LegacyGeneratorOptions);
+        generateDtos(finalConfig)
+          .then(() => {
+            const end = new Date();
+            console.log(
+              `start:${start},end:${end},total:${
+                end.getTime() - start.getTime()
+              }`
+            );
+          })
+          .catch((error) => {
+            if (error instanceof DtoGeneratorError) {
+              // Error already logged by generateDtos function
+              console.error(`\n[ERROR] ${error.message}`);
+              if (error.context && Object.keys(error.context).length > 0) {
+                console.error(
+                  `Context: ${JSON.stringify(error.context, null, 2)}`
+                );
+              }
+            } else {
+              console.error(`\n[ERROR] ${error.message || error}`);
+            }
+            process.exit(1);
+          });
+      }
+    }
+  }
+}
