@@ -1,8 +1,6 @@
-#!/usr/bin/env node
-import { program } from 'commander';
 import { generateResource } from './resource-generators/resource-generator';
 import { analyzeEntity } from './resource-utils/entity-analyzer';
-import { findAndLoadConfig } from './shared-config/config-loader';
+import { findAndLoadLegacyConfig } from './shared-config/config-loader';
 import { parsePath, resolveOutputPath } from './resource-utils/path-resolver';
 import { DtoGeneratorConfig, defaultConfig } from './types/config.types';
 
@@ -80,28 +78,9 @@ async function generateSingleEntityResource(
 }
 
 /**
- * CLI entry point
+ * Entry point for resource generation (called from main CLI)
  */
-async function runCli(entityPath?: string, options?: any): Promise<void> {
-  if (!entityPath) {
-    // If no entity path is provided, set up the CLI program for direct execution
-    program
-      .name('resource-generator')
-      .description('CLI tool to generate NestJS resource from MikroORM entities')
-      .version('0.0.1')
-      .requiredOption('-e, --entity <path>', 'Path to the entity file')
-      .option('--dir <path>', 'Relative directory for output files (used if -e does not match template)')
-      .option('--generate-module', 'Generate NestJS module', true)
-      .option('--generate-service', 'Generate NestJS service', true)
-      .option('--generate-controller', 'Generate NestJS controller', true)
-      .option('--force', 'Overwrite existing files', false)
-      .parse(process.argv);
-
-    const cliOptions = program.opts<CliOptions>();
-    options = cliOptions;
-    entityPath = cliOptions.entity;
-  }
-
+async function runCli(entityPath: string, options: any): Promise<void> {
   // Use provided options or defaults
   const runOptions: CliOptions = {
     entity: entityPath,
@@ -113,7 +92,7 @@ async function runCli(entityPath?: string, options?: any): Promise<void> {
   };
 
   // Load configuration
-  const config = await findAndLoadConfig() || new DtoGeneratorConfig({ input: '', output: '' });
+  const config = await findAndLoadLegacyConfig() || new DtoGeneratorConfig({ input: '', output: '' });
 
 
   console.log('🔍 Analyzing entity:', runOptions.entity);
@@ -127,14 +106,6 @@ async function runCli(entityPath?: string, options?: any): Promise<void> {
 
   // Create output directory if it doesn't exist
   await generateSingleEntityResource(config, runOptions);
-}
-
-// Run CLI if this file is executed directly
-if (require.main === module) {
-  runCli().catch(error => {
-    console.error('Fatal error:', error);
-    process.exit(1);
-  });
 }
 
 export { runCli, generateSingleEntityResource };

@@ -12,7 +12,7 @@
   },
   "files": [
     "dist",
-    "src/to-copy",:
+    "src/to-copy",
     "package.json",
     "README.md"
   ],

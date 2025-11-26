@@ -4,7 +4,7 @@ import { EntityInfo } from '../resource-utils/entity-analyzer';
 import { generateModule } from './module-generator';
 import { generateService } from './service-generator';
 import { generateController } from './controller-generator';
-import { findAndLoadDtoConfig } from '../resource-utils/config-loader';
+import { findAndLoadLegacyConfig } from '../shared-config/config-loader';
 
 export interface ResourceOptions {
   generateModule: boolean;
@@ -24,7 +24,7 @@ export type OutputPaths = {
  */
 export async function generateResource(entityInfo: EntityInfo, outputPaths: OutputPaths, options: ResourceOptions): Promise<void> {
   // Load DTO configuration to determine DTO import paths
-  const dtoConfig = await findAndLoadDtoConfig();
+  const dtoConfig = await findAndLoadLegacyConfig();
   if (!dtoConfig) {
     console.log('⚠️  No DTO configuration found, using default DTO paths');
   }

@@ -3,8 +3,8 @@ import fs from "fs";
 import path from "path";
 import { generateDtos } from "./cli";
 import { GeneratorType, DtoGeneratorConfig } from "./types/config.types";
-import { mergeConfigWithInteractiveAnswers } from "./utils/config-merger";
-import { findAndLoadConfig } from "./utils/config-loader";
+import { mergeConfigWithInteractiveAnswers } from "./shared-config/config-merger";
+import { findAndLoadLegacyConfig } from "./shared-config/config-loader";
 
 interface InteractiveAnswers {
   inputPattern: string;
@@ -25,7 +25,7 @@ export async function runInteractiveMode(): Promise<void> {
     // Try to load configuration file for defaults
     let defaultConfig: DtoGeneratorConfig | null = null;
     try {
-      defaultConfig = await findAndLoadConfig();
+      defaultConfig = await findAndLoadLegacyConfig();
       if (defaultConfig) {
         console.log("✓ Found configuration file, using as defaults");
       }

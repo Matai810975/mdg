@@ -133,9 +133,9 @@ export function mergeConfigWithInteractiveAnswers(
 export async function loadAndMergeConfig(
   cliOptions: Partial<LegacyGeneratorOptions> = {}
 ): Promise<DtoGeneratorConfig | null> {
-  const { findAndLoadConfig } = await import('./config-loader');
+  const { findAndLoadLegacyConfig } = await import('./config-loader');
 
-  const baseConfig = await findAndLoadConfig();
+  const baseConfig = await findAndLoadLegacyConfig();
 
   if (!baseConfig) {
     return null;

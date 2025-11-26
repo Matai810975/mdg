@@ -22,8 +22,9 @@ import {
   GeneratorType,
   legacyToConfig,
 } from "./types/config.types";
-import { loadAndMergeConfig } from "./utils/config-merger";
-import { loadConfigFile, validateConfig } from "./utils/config-loader";
+import { loadAndMergeConfig } from "./shared-config/config-merger";
+import { loadLegacyConfigFile } from "./shared-config/config-loader";
+import { validateConfig } from "./shared-config/config-validator";
 import { runCli as runResourceCli } from "./resource-cli"; // Import the resource CLI
 
 /**
@@ -34,7 +35,7 @@ async function loadConfiguration(options: any): Promise<DtoGeneratorConfig> {
 
   if (options.config) {
     // Load specific configuration file
-    config = await loadConfigFile(options.config);
+    config = await loadLegacyConfigFile(options.config);
     console.log(`✓ Loaded configuration from: ${options.config}`);
   } else {
     // Auto-detect configuration file
@@ -90,11 +91,11 @@ async function validateConfigMode(configPath?: string): Promise<void> {
     let config;
 
     if (configPath) {
-      config = await loadConfigFile(configPath);
+      config = await loadLegacyConfigFile(configPath);
       console.log(`✓ Loaded configuration from: ${configPath}`);
     } else {
-      const { findAndLoadConfig } = await import("./utils/config-loader");
-      config = await findAndLoadConfig();
+      const { findAndLoadLegacyConfig } = await import("./shared-config/config-loader");
+      config = await findAndLoadLegacyConfig();
       if (!config) {
         console.error("❌ No configuration file found");
         process.exit(1);

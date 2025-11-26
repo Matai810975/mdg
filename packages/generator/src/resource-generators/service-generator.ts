@@ -2,7 +2,7 @@ import { EntityInfo } from '../resource-utils/entity-analyzer';
 import { TemplateUtils } from '../resource-utils/template-utils';
 import * as path from 'path';
 import { DtoGeneratorConfig } from '../types/config.types';
-import { getEntityDtoImports } from '../resource-utils/config-loader';
+import { getEntityDtoImports } from '../resource-utils/dto-path-utils';
 
 /**
  * Generate NestJS service content for an entity using Handlebars template

@@ -2,6 +2,8 @@ import path from 'path';
 import fs from 'fs';
 import {
   DtoGeneratorConfig,
+  MikroNestForgeConfig,
+  legacyToNewConfig,
   defaultConfig
 } from '../types/config.types';
 import { validateAndApplyDefaults } from './config-validator';
@@ -25,11 +27,36 @@ const DEFAULT_CONFIG_FILES = [
 ];
 
 /**
+ * Detect if config is using the new MikroNestForgeConfig format
+ */
+function isNewConfigFormat(config: any): config is MikroNestForgeConfig {
+  return config instanceof MikroNestForgeConfig ||
+    (config && 'mappingGeneratorOptions' in config && 'scaffoldGeneratorOptions' in config);
+}
+
+/**
+ * Show deprecation warning for legacy config format
+ */
+function showDeprecationWarning(): void {
+  console.warn('⚠️  DEPRECATION WARNING:');
+  console.warn('   You are using the legacy DtoGeneratorConfig format.');
+  console.warn('   Please migrate to the new MikroNestForgeConfig format.');
+  console.warn('   The legacy format will be removed in v3.0.0.');
+  console.warn('   See migration guide for details.');
+  console.warn('');
+}
+
+/**
  * Load configuration from a TypeScript or JavaScript file
+ * Supports both new (MikroNestForgeConfig) and legacy (DtoGeneratorConfig) formats
  * @param configPath Path to the configuration file
+ * @param returnLegacyFormat If true, always return DtoGeneratorConfig (default: true for backward compatibility)
  * @returns Loaded configuration
  */
-export async function loadConfigFile(configPath: string): Promise<DtoGeneratorConfig> {
+export async function loadConfigFile(
+  configPath: string,
+  returnLegacyFormat: boolean = true
+): Promise<DtoGeneratorConfig | MikroNestForgeConfig> {
   const resolvedPath = path.resolve(process.cwd(), configPath);
 
   if (!fs.existsSync(resolvedPath)) {
@@ -90,10 +117,31 @@ export async function loadConfigFile(configPath: string): Promise<DtoGeneratorCo
       config = configModule.default || configModule;
     }
 
-    // Validate and apply defaults using enhanced validation
-    const finalConfig = validateAndApplyDefaults(config as Partial<DtoGeneratorConfig>);
+    // Detect config format and handle appropriately
+    const isNewFormat = isNewConfigFormat(config);
 
-    return finalConfig;
+    if (isNewFormat) {
+      // Using new format
+      console.log('✓ Loaded DTO configuration (new format)');
+
+      if (returnLegacyFormat) {
+        // Convert to legacy format for backward compatibility
+        const { newToLegacyConfig } = require('../types/config.types');
+        return validateAndApplyDefaults(newToLegacyConfig(config) as Partial<DtoGeneratorConfig>);
+      } else {
+        // Return new format as-is (validation will be added in Phase 4)
+        return config as MikroNestForgeConfig;
+      }
+    } else {
+      // Using legacy format
+      showDeprecationWarning();
+      console.log('✓ Loaded DTO configuration (legacy format)');
+
+      // Validate and apply defaults using enhanced validation
+      const finalConfig = validateAndApplyDefaults(config as Partial<DtoGeneratorConfig>);
+
+      return finalConfig;
+    }
   } catch (error) {
     if (error instanceof Error && (
       error.message.includes('not found') ||
@@ -107,14 +155,38 @@ export async function loadConfigFile(configPath: string): Promise<DtoGeneratorCo
 
 /**
  * Find and load configuration file from default locations
+ * @param returnLegacyFormat If true, always return DtoGeneratorConfig (default: true for backward compatibility)
  * @returns Loaded configuration or null if no config file found
  */
-export async function findAndLoadConfig(): Promise<DtoGeneratorConfig | null> {
+export async function findAndLoadConfig(
+  returnLegacyFormat: boolean = true
+): Promise<DtoGeneratorConfig | MikroNestForgeConfig | null> {
   for (const configFile of DEFAULT_CONFIG_FILES) {
     const configPath = path.resolve(process.cwd(), configFile);
     if (fs.existsSync(configPath)) {
-      return await loadConfigFile(configFile);
+      return await loadConfigFile(configFile, returnLegacyFormat);
     }
   }
   return null;
+}
+
+/**
+ * Load configuration file, always returning legacy DtoGeneratorConfig format
+ * This is a type-safe helper for code that expects DtoGeneratorConfig
+ * @param configPath Path to the configuration file
+ * @returns Loaded configuration in legacy format
+ */
+export async function loadLegacyConfigFile(configPath: string): Promise<DtoGeneratorConfig> {
+  const config = await loadConfigFile(configPath, true);
+  return config as DtoGeneratorConfig;
+}
+
+/**
+ * Find and load configuration file, always returning legacy DtoGeneratorConfig format
+ * This is a type-safe helper for code that expects DtoGeneratorConfig
+ * @returns Loaded configuration in legacy format or null if no config file found
+ */
+export async function findAndLoadLegacyConfig(): Promise<DtoGeneratorConfig | null> {
+  const config = await findAndLoadConfig(true);
+  return config as DtoGeneratorConfig | null;
 }
