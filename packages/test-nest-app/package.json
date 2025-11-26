@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "generate-dto": "mn-forge generate-dto",
+    "update-dto-mapping": "mn-forge update-dto-mapping",
     "generate-scaffold": "mn-forge generate-scaffold",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

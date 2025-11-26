@@ -17,7 +17,6 @@ import { DtoGeneratorError } from "./errors/DtoGeneratorError";
 import { logError } from "./errors/error-utils";
 import {
   MikroNestForgeConfig,
-  GeneratorType,
 } from "./types/config.types";
 import { loadConfigFile, findAndLoadConfig } from "./shared-config/config-loader";
 import { validateNewConfig } from "./shared-config/config-validator";
@@ -415,51 +414,20 @@ if (require.main === module) {
     .description("MikroNestForge - CLI tool to generate NestJS DTOs, mappings, and resource scaffolding from MikroORM entities.")
     .version("0.0.1");
 
-  // generate-dto subcommand
+  // update-dto-mapping subcommand
   program
-    .command("generate-dto")
-    .description("Generate DTOs from MikroORM entities")
-    .option(
-      "-i, --input <pattern>",
-      "Path or glob pattern to the MikroORM entities (e.g., 'src/entities/*.ts', 'src/models/**/*.ts')"
-    )
-    .option("-o, --output <path>", "Path to the output directory for DTOs")
-    .option("--generate-dto", "Generate DTO files", false)
-    .option("--generate-create-dto", "Generate Create DTO files", false)
-    .option("--generate-update-dto", "Generate Update DTO files", false)
-    .option("--generate-find-many-dto", "Generate FindMany DTO files", false)
-    .option(
-      "--generate-find-many-response-dto",
-      "Generate FindManyResponse DTO files",
-      false
-    )
-    .option(
-      "--generate-find-many-to-filter",
-      "Generate FindMany DTO to filter mapping functions",
-      false
-    )
-    .option("--generate-mapping", "Generate mapping functions", false)
-    .option(
-      "--generate-create-dto-to-entity",
-      "Generate create DTO to entity mapping functions",
-      false
-    )
-    .option(
-      "--generate-update-dto-to-entity",
-      "Generate update DTO to entity mapping functions",
-      false
-    )
+    .command("update-dto-mapping")
+    .description("Generate and update DTOs and mapping functions from MikroORM entities")
+    .option("-c, --config <path>", "Path to a specific configuration file")
     .option(
       "--parallel",
-      "Enable parallel processing for faster generation",
+      "Override config: enable parallel processing for faster generation",
       false
     )
     .option(
       "--concurrency <number>",
-      "Set the number of concurrent workers for parallel processing",
-      "4"
+      "Override config: set the number of concurrent workers for parallel processing"
     )
-    .option("-c, --config <path>", "Path to a specific configuration file")
     .option(
       "--validate",
       "Only validate the configuration file without generating DTOs",
@@ -467,6 +435,7 @@ if (require.main === module) {
     )
     .action((options) => {
       const start = new Date();
+
       // Handle validation mode
       if (options.validate) {
         validateConfigMode(options.config).catch((error) => {
@@ -477,6 +446,19 @@ if (require.main === module) {
         // Load configuration file
         loadConfiguration(options)
           .then((config) => {
+            // Apply CLI overrides if provided
+            if (options.parallel !== undefined && options.parallel !== false) {
+              config.mappingGeneratorOptions.performance.enabled = true;
+            }
+            if (options.concurrency) {
+              const concurrency = parseInt(options.concurrency, 10);
+              if (isNaN(concurrency) || concurrency < 1) {
+                console.error("Error: --concurrency must be a positive number");
+                process.exit(1);
+              }
+              config.mappingGeneratorOptions.performance.workerCount = concurrency;
+            }
+
             return generateDtos(config);
           })
           .then(() => {
@@ -489,7 +471,6 @@ if (require.main === module) {
           })
           .catch((error) => {
             if (error instanceof DtoGeneratorError) {
-              // Error already logged by generateDtos function
               console.error(`\n[ERROR] ${error.message}`);
               if (error.context && Object.keys(error.context).length > 0) {
                 console.error(
@@ -502,90 +483,6 @@ if (require.main === module) {
             process.exit(1);
           });
       }
-    });
-
-  // update-mappings subcommand
-  program
-    .command("update-mappings")
-    .description("Generate mapping files for entities to DTOs and back")
-    .option(
-      "-i, --input <pattern>",
-      "Path or glob pattern to the MikroORM entities (e.g., 'src/entities/*.ts', 'src/models/**/*.ts')"
-    )
-    .option("-o, --output <path>", "Path to the output directory for mappings")
-    .option("--generate-mapping", "Generate entity to DTO mapping functions", true)
-    .option(
-      "--generate-create-dto-to-entity",
-      "Generate create DTO to entity mapping functions",
-      true
-    )
-    .option(
-      "--generate-update-dto-to-entity",
-      "Generate update DTO to entity mapping functions",
-      true
-    )
-    .option(
-      "--generate-find-many-to-filter",
-      "Generate FindMany DTO to filter mapping functions",
-      true
-    )
-    .option("--parallel", "Enable parallel processing for faster generation", false)
-    .option(
-      "--concurrency <number>",
-      "Set the number of concurrent workers for parallel processing",
-      "4"
-    )
-    .option("-c, --config <path>", "Path to a specific configuration file")
-    .action((options) => {
-      // Set default generators for update-mappings if none specified
-      if (!options.generateMapping &&
-          !options["generateCreateDtoToEntity"] &&
-          !options["generateUpdateDtoToEntity"] &&
-          !options["generateFindManyToFilter"]) {
-        options.generateMapping = true;
-        options["generateCreateDtoToEntity"] = true;
-        options["generateUpdateDtoToEntity"] = true;
-        options["generateFindManyToFilter"] = true;
-      }
-
-      const start = new Date();
-
-      loadConfiguration(options)
-        .then((config) => {
-          // Override generators to only include mapping-related ones
-          const mappingGenerators: GeneratorType[] = [];
-          if (options.generateMapping) mappingGenerators.push("entity-to-dto");
-          if (options["generateCreateDtoToEntity"]) mappingGenerators.push("create-dto-to-entity");
-          if (options["generateUpdateDtoToEntity"]) mappingGenerators.push("update-dto-to-entity");
-          if (options["generateFindManyToFilter"]) mappingGenerators.push("find-many-to-filter");
-
-          if (mappingGenerators.length > 0) {
-            config.mappingGeneratorOptions.generators = mappingGenerators;
-          }
-          return generateDtos(config);
-        })
-        .then(() => {
-          const end = new Date();
-          console.log(
-            `start:${start},end:${end},total:${
-              end.getTime() - start.getTime()
-            }`
-          );
-        })
-        .catch((error) => {
-          if (error instanceof DtoGeneratorError) {
-            // Error already logged by generateDtos function
-            console.error(`\n[ERROR] ${error.message}`);
-            if (error.context && Object.keys(error.context).length > 0) {
-              console.error(
-                `Context: ${JSON.stringify(error.context, null, 2)}`
-              );
-            }
-          } else {
-            console.error(`\n[ERROR] ${error.message || error}`);
-          }
-          process.exit(1);
-        });
     });
 
   // generate-scaffold subcommand (for resource generation)

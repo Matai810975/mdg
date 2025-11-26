@@ -1,6 +1,6 @@
 {
   "name": "@mikro-nest-forge/mikro-nest-forge",
-  "version": "0.0.2",
+  "version": "3.1.0",
   "description": "CLI tool that generates NestJS DTOs, mappings, and resource scaffolding from MikroORM entities",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

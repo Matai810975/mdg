@@ -36,7 +36,7 @@ export class PerformanceConfig {
 
 /**
  * Configuration for mapping generation (DTOs + mapping functions)
- * Used by: generate-dto, update-mappings commands
+ * Used by: update-dto-mapping command
  */
 export class MappingGeneratorOptions {
   /** Glob pattern for entity files (e.g., 'src/entities/**\/*.ts') */

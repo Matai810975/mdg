@@ -14,13 +14,102 @@ Version 3.0 is a **major breaking release** that completely removes support for 
 
 If you're currently using v1.x (legacy `DtoGeneratorConfig`), you must migrate to the v2.0+ format before upgrading to v3.0.
 
+---
+
+# v3.1 Changes (Current)
+
+## Command Consolidation
+
+### Breaking Change: Commands Merged
+
+The `generate-dto` and `update-mappings` commands have been **removed** and consolidated into a single `update-dto-mapping` command.
+
+**Reason**: Both commands were functionally identical - they both called the same generation logic with the config file as the source of truth. The separation created unnecessary complexity.
+
+#### Migration
+
+**Before (v3.0)**:
+```bash
+# Generate all DTOs and mappings
+pnpm mn-forge generate-dto
+
+# Update only mapping functions
+pnpm mn-forge update-mappings
+```
+
+**After (v3.1)**:
+```bash
+# Generate/update DTOs and mappings (controlled by config file)
+pnpm mn-forge update-dto-mapping
+```
+
+#### What Changed?
+
+1. **Single Command**: Use `update-dto-mapping` for all DTO and mapping generation
+2. **Config is Source of Truth**: The `generators` array in your config file determines what gets generated
+3. **Simplified Flags**: Removed all unused generator selection flags (`--generate-dto`, `--generate-mapping`, etc.)
+4. **Performance Overrides Only**: CLI flags now only override performance settings (`--parallel`, `--concurrency`)
+
+#### Controlling What Gets Generated
+
+Edit your `mikro-nest-forge.config.ts` to control which generators run:
+
+```typescript
+const config = new MikroNestForgeConfig({
+  mappingGeneratorOptions: {
+    entitiesGlob: "src/entities/**/*.ts",
+    outputDir: "src/generated/mikro-nest-forge",
+    // Control what gets generated here:
+    generators: [
+      // DTOs
+      "dto",
+      "create-dto",
+      "update-dto",
+      "find-many-dto",
+      "find-many-response-dto",
+      // Mappings
+      "entity-to-dto",
+      "create-dto-to-entity",
+      "update-dto-to-entity",
+      "find-many-to-filter"
+    ],
+    performance: {
+      enabled: true,
+      workerCount: 4
+    }
+  }
+});
+```
+
+**Examples:**
+- **To generate everything**: Include all 9 generator types (default)
+- **To generate only DTOs**: Remove the 4 mapping generators from the array
+- **To generate only mappings**: Remove the 5 DTO generators from the array
+
+#### Available CLI Flags
+
+```bash
+# Specify config file location
+mn-forge update-dto-mapping -c path/to/config.ts
+
+# Override performance settings
+mn-forge update-dto-mapping --parallel --concurrency 8
+
+# Validate config without running
+mn-forge update-dto-mapping --validate
+```
+
+---
+
+# v3.0 Changes
+
 ## What's Changed?
 
 ### Configuration Structure Redesign
 
 The configuration has been reorganized into two distinct sections:
 
-1. **`mappingGeneratorOptions`** - Settings for DTO and mapping function generation (used by `generate-dto` and `update-mappings` commands)
+1. **`mappingGeneratorOptions`** - Settings for DTO and mapping function generation (used by `update-dto-mapping` command)
 2. **`scaffoldGeneratorOptions`** - Settings for resource scaffolding (used by `generate-scaffold` command)
 
 ### Property Renames
@@ -154,7 +243,7 @@ validateNewConfig(config);
 - `workerCount` is more descriptive than `concurrency`
 
 ### 3. **Better Alignment with Commands**
-- `mappingGeneratorOptions` → used by `generate-dto` and `update-mappings`
+- `mappingGeneratorOptions` → used by `update-dto-mapping`
 - `scaffoldGeneratorOptions` → used by `generate-scaffold`
 
 ### 4. **Easier to Extend**

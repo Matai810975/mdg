@@ -14,8 +14,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build the generator package
 pnpm -C packages/generator build
 
-# Test generating DTOs from entities
-pnpm -C packages/test-nest-app generate-dto
+# Test generating DTOs and mappings from entities
+pnpm -C packages/test-nest-app update-dto-mapping
 
 # Test generating resource scaffolding from entities
 pnpm -C packages/test-nest-app generate-scaffold
@@ -43,7 +43,7 @@ The system follows a modular generator pipeline: `Entity Files → Entity Regist
 ### Key Components
 
 1. **Entry Points**
-   - `packages/generator/src/cli.ts` - Main MikroNestForge CLI with subcommands (generate-dto, update-mappings, generate-scaffold)
+   - `packages/generator/src/cli.ts` - Main MikroNestForge CLI with subcommands (update-dto-mapping, generate-scaffold)
    - `packages/generator/src/resource-cli.ts` - Resource scaffolding generator CLI (called by generate-scaffold subcommand)
 
 2. **Generator Types**
@@ -109,7 +109,7 @@ export default config;
 **Key Configuration Classes:**
 
 - **`MikroNestForgeConfig`**: Root configuration
-  - `mappingGeneratorOptions`: Settings for `generate-dto` and `update-mappings` commands
+  - `mappingGeneratorOptions`: Settings for `update-dto-mapping` command
   - `scaffoldGeneratorOptions`: Settings for `generate-scaffold` command
 
 - **`MappingGeneratorOptions`**: DTO and mapping generation settings
@@ -157,7 +157,7 @@ The system continues processing other entities when individual entities fail, pr
 1. **Making Changes to Generator Logic**
    - Edit files in `packages/generator/src/`
    - Run `pnpm run build` in generator package
-   - Test changes for dto/mapping generation using `pnpm -C packages/test-nest-app generate-dto`
+   - Test changes for dto/mapping generation using `pnpm -C packages/test-nest-app update-dto-mapping`
    - Test changes for resource scaffolding generation using `cd packages/test-nest-app && rm -rf src/generated/{resource-path} && pnpm generate-scaffold -e src/entities/{entity-name}.ts -o src/generated`
 
 
