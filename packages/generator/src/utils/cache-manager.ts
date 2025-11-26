@@ -1,5 +1,5 @@
 /**
- * Cache Manager for mikro-dto-generator
+ * Cache Manager for MikroNestForge
  * Provides memoization utilities for expensive operations
  */
 

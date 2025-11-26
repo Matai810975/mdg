@@ -27,7 +27,7 @@
   // ensure container can resolve host.docker.internal to the host.
   "runArgs": ["--add-host=host.docker.internal:host-gateway"],
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "npm config set @mdg:registry http://host.docker.internal:4873/ --location=user && npm config set registry https://registry.npmmirror.com && pnpm config set registry https://registry.npmmirror.com && pnpm install && npm install -g @anthropic-ai/claude-code && npm install -g @musistudio/claude-code-router",
+  "postCreateCommand": "npm config set @mikro-nest-forge:registry http://host.docker.internal:4873/ --location=user && npm config set registry https://registry.npmmirror.com && pnpm config set registry https://registry.npmmirror.com && pnpm install && npm install -g @anthropic-ai/claude-code && npm install -g @musistudio/claude-code-router",
   "postStartCommand": "mkdir -p ~/.claude-code-router && cp -f ccr.config.json ~/.claude-code-router/config.json || true"
   // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
   // "remoteUser": "root"

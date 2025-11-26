@@ -19,7 +19,7 @@ interface InteractiveAnswers {
  * Interactive CLI interface for the DTO generator
  */
 export async function runInteractiveMode(): Promise<void> {
-  console.log("🚀 Welcome to Mikro ORM DTO Generator - Interactive Mode\n");
+  console.log("🚀 Welcome to MikroNestForge - Interactive Mode\n");
 
   try {
     // Try to load configuration file for defaults

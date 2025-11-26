@@ -1,7 +1,7 @@
 {
-  "name": "@mdg/mikro-dto-generator",
+  "name": "@mikro-nest-forge/mikro-nest-forge",
   "version": "0.0.2",
-  "description": "CLI tool that generates NestJS DTOs from MikroORM entities",
+  "description": "CLI tool that generates NestJS DTOs, mappings, and resource scaffolding from MikroORM entities",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -12,13 +12,12 @@
   },
   "files": [
     "dist",
-    "src/to-copy",
+    "src/to-copy",:
     "package.json",
     "README.md"
   ],
   "bin": {
-    "generate-dto": "dist/cli.js",
-    "generate-resource": "dist/resource-cli.js"
+    "mn-forge": "dist/cli.js"
   },
   "scripts": {
     "prepare": "pnpm run build",

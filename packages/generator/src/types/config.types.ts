@@ -47,7 +47,7 @@ export class ResourceGeneratorConfig {
 }
 
 /**
- * Configuration class for the mikro-dto-generator
+ * Configuration class for MikroNestForge
  * This class defines the structure of the TypeScript configuration file with default values
  */
 export class DtoGeneratorConfig {

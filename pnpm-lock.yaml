@@ -87,7 +87,7 @@ importers:
       '@eslint/js':
         specifier: ^9.18.0
         version: 9.39.1
-      '@mdg/mikro-dto-generator':
+      '@mikro-nest-forge/mikro-nest-forge':
         specifier: workspace:*
         version: link:../generator
       '@nestjs/cli':

@@ -10,12 +10,16 @@ import { validateAndApplyDefaults } from './config-validator';
  * Default configuration file names to look for (in priority order)
  */
 const DEFAULT_CONFIG_FILES = [
-  'mikro-dto-generator.config.ts',  // Primary default
-  'mikro-dto-generator.config.js',  // Primary default (JS version)
+  'mikro-nest-forge.config.ts',     // Primary default
+  'mikro-nest-forge.config.js',     // Primary default (JS version)
+  'mikro-dto-generator.config.ts',  // Legacy support
+  'mikro-dto-generator.config.js',  // Legacy support (JS version)
   'dto-generator.config.ts',        // Legacy support
   'dto-generator.config.js',        // Legacy support (JS version)
   'mikro-dto.config.ts',            // Alternative naming
   'mikro-dto.config.js',            // Alternative naming (JS version)
+  '.mikro-nest-forge.config.ts',    // Hidden file support
+  '.mikro-nest-forge.config.js',    // Hidden file support (JS version)
   '.dto-generatorrc.ts',            // Hidden file support
   '.dto-generatorrc.js'             // Hidden file support (JS version)
 ];

@@ -1,8 +1,8 @@
-import { DtoGeneratorConfig } from "@mdg/mikro-dto-generator";
+import { DtoGeneratorConfig } from "@mikro-nest-forge/mikro-nest-forge";
 
 const config = new DtoGeneratorConfig({
   input: "src/entities/**/*.ts",
-  output: "src/generated/mdg",
+  output: "src/generated/mikro-nest-forge",
   generators: [
     "dto",
     "create-dto",

@@ -82,36 +82,51 @@ async function generateSingleEntityResource(
 /**
  * CLI entry point
  */
-async function runCli(): Promise<void> {
-  program
-    .name('resource-generator')
-    .description('CLI tool to generate NestJS resource from MikroORM entities')
-    .version('0.0.1')
-    .requiredOption('-e, --entity <path>', 'Path to the entity file')
-    .option('--dir <path>', 'Relative directory for output files (used if -e does not match template)')
-    .option('--generate-module', 'Generate NestJS module', true)
-    .option('--generate-service', 'Generate NestJS service', true)
-    .option('--generate-controller', 'Generate NestJS controller', true)
-    .option('--force', 'Overwrite existing files', false)
-    .parse(process.argv);
+async function runCli(entityPath?: string, options?: any): Promise<void> {
+  if (!entityPath) {
+    // If no entity path is provided, set up the CLI program for direct execution
+    program
+      .name('resource-generator')
+      .description('CLI tool to generate NestJS resource from MikroORM entities')
+      .version('0.0.1')
+      .requiredOption('-e, --entity <path>', 'Path to the entity file')
+      .option('--dir <path>', 'Relative directory for output files (used if -e does not match template)')
+      .option('--generate-module', 'Generate NestJS module', true)
+      .option('--generate-service', 'Generate NestJS service', true)
+      .option('--generate-controller', 'Generate NestJS controller', true)
+      .option('--force', 'Overwrite existing files', false)
+      .parse(process.argv);
 
-  const options = program.opts<CliOptions>();
+    const cliOptions = program.opts<CliOptions>();
+    options = cliOptions;
+    entityPath = cliOptions.entity;
+  }
+
+  // Use provided options or defaults
+  const runOptions: CliOptions = {
+    entity: entityPath,
+    dir: options?.dir,
+    generateModule: options?.generateModule ?? true,
+    generateService: options?.generateService ?? true,
+    generateController: options?.generateController ?? true,
+    force: options?.force ?? false,
+  };
 
   // Load configuration
   const config = await findAndLoadConfig() || new DtoGeneratorConfig({ input: '', output: '' });
 
 
-  console.log('🔍 Analyzing entity:', options.entity);
+  console.log('🔍 Analyzing entity:', runOptions.entity);
   console.log('⚙️  Options:', {
-    dir: options.dir,
-    generateModule: options.generateModule,
-    generateService: options.generateService,
-    generateController: options.generateController,
-    force: options.force
+    dir: runOptions.dir,
+    generateModule: runOptions.generateModule,
+    generateService: runOptions.generateService,
+    generateController: runOptions.generateController,
+    force: runOptions.force
   });
 
   // Create output directory if it doesn't exist
-  await generateSingleEntityResource(config, options);
+  await generateSingleEntityResource(config, runOptions);
 }
 
 // Run CLI if this file is executed directly

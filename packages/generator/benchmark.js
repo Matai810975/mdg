@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 async function runBenchmark() {
-  console.log('🚀 mikro-dto-generator Performance Benchmark\n');
+  console.log('🚀 MikroNestForge Performance Benchmark\n');
 
   // Clean up any previous benchmark output
   const benchmarkOutputDir = path.join(__dirname, 'benchmark-output');
@@ -80,7 +80,7 @@ async function runBenchmark() {
 // Handle command line arguments
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
-mikro-dto-generator Performance Benchmark
+MikroNestForge Performance Benchmark
 
 Usage:
   node benchmark.js [options]

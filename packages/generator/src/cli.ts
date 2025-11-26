@@ -19,10 +19,12 @@ import { logError } from "./errors/error-utils";
 import {
   DtoGeneratorConfig,
   LegacyGeneratorOptions,
+  GeneratorType,
   legacyToConfig,
 } from "./types/config.types";
 import { loadAndMergeConfig } from "./utils/config-merger";
 import { loadConfigFile, validateConfig } from "./utils/config-loader";
+import { runCli as runResourceCli } from "./resource-cli"; // Import the resource CLI
 
 /**
  * Load configuration with support for specific config file path
@@ -429,12 +431,17 @@ function copyDirectory(src: string, dest: string): void {
   }
 }
 
-// CLI entry point
+// CLI entry point with subcommands for MikroNestForge
 if (require.main === module) {
-  const start = new Date();
   program
-    .version("0.0.1")
-    .description("A CLI tool to generate NestJS DTOs from MikroORM entities.")
+    .name("mn-forge")
+    .description("MikroNestForge - CLI tool to generate NestJS DTOs, mappings, and resource scaffolding from MikroORM entities.")
+    .version("0.0.1");
+
+  // generate-dto subcommand
+  program
+    .command("generate-dto")
+    .description("Generate DTOs from MikroORM entities")
     .option(
       "-i, --input <pattern>",
       "Path or glob pattern to the MikroORM entities (e.g., 'src/entities/*.ts', 'src/models/**/*.ts')"
@@ -487,29 +494,157 @@ if (require.main === module) {
       "Only validate the configuration file without generating DTOs",
       false
     )
-    .parse(process.argv);
+    .action((options) => {
+      const start = new Date();
+      // Handle validation mode
+      if (options.validate) {
+        validateConfigMode(options.config).catch((error) => {
+          console.error("Configuration validation failed:", error);
+          process.exit(1);
+        });
+      } else {
+        // Check if interactive mode is requested
+        if (options.interactive) {
+          runInteractiveMode().catch((error) => {
+            console.error("Interactive mode failed:", error);
+            process.exit(1);
+          });
+        } else {
+          // Load configuration file as default (unless explicitly disabled)
+          const shouldLoadConfig = !options.skipConfig;
+          if (shouldLoadConfig) {
+            loadConfiguration(options)
+              .then((config) => {
+                return generateDtos(config);
+              })
+              .then(() => {
+                const end = new Date();
+                console.log(
+                  `start:${start},end:${end},total:${
+                    end.getTime() - start.getTime()
+                  }`
+                );
+              })
+              .catch((error) => {
+                if (error instanceof DtoGeneratorError) {
+                  // Error already logged by generateDtos function
+                  console.error(`\n[ERROR] ${error.message}`);
+                  if (error.context && Object.keys(error.context).length > 0) {
+                    console.error(
+                      `Context: ${JSON.stringify(error.context, null, 2)}`
+                    );
+                  }
+                } else {
+                  console.error(`\n[ERROR] ${error.message || error}`);
+                }
+                process.exit(1);
+              });
+          } else {
+            // Skip config loading, use CLI options only
+            console.log("⚠️  Skipping configuration file loading");
 
-  const options = program.opts();
-  // Handle validation mode
-  if (options.validate) {
-    validateConfigMode(options.config).catch((error) => {
-      console.error("Configuration validation failed:", error);
-      process.exit(1);
+            // Validate required options
+            if (!options.input || !options.output) {
+              console.error(
+                "Error: Please provide both input pattern and output paths."
+              );
+              console.error(
+                "Example: mn-forge generate-dto --input 'src/entities/*.entity.ts' --output './dtos'"
+              );
+              process.exit(1);
+            }
+
+            const finalConfig = legacyToConfig(options as LegacyGeneratorOptions);
+            generateDtos(finalConfig)
+              .then(() => {
+                const end = new Date();
+                console.log(
+                  `start:${start},end:${end},total:${
+                    end.getTime() - start.getTime()
+                  }`
+                );
+              })
+              .catch((error) => {
+                if (error instanceof DtoGeneratorError) {
+                  // Error already logged by generateDtos function
+                  console.error(`\n[ERROR] ${error.message}`);
+                  if (error.context && Object.keys(error.context).length > 0) {
+                    console.error(
+                      `Context: ${JSON.stringify(error.context, null, 2)}`
+                    );
+                  }
+                } else {
+                  console.error(`\n[ERROR] ${error.message || error}`);
+                }
+                process.exit(1);
+              });
+          }
+        }
+      }
     });
-  } else {
-    // Check if interactive mode is requested
-    if (options.interactive) {
-      runInteractiveMode().catch((error) => {
-        console.error("Interactive mode failed:", error);
-        process.exit(1);
-      });
-    } else {
-      // Load configuration file as default (unless explicitly disabled)
+
+  // update-mappings subcommand
+  program
+    .command("update-mappings")
+    .description("Generate mapping files for entities to DTOs and back")
+    .option(
+      "-i, --input <pattern>",
+      "Path or glob pattern to the MikroORM entities (e.g., 'src/entities/*.ts', 'src/models/**/*.ts')"
+    )
+    .option("-o, --output <path>", "Path to the output directory for mappings")
+    .option("--generate-mapping", "Generate entity to DTO mapping functions", true)
+    .option(
+      "--generate-create-dto-to-entity",
+      "Generate create DTO to entity mapping functions",
+      true
+    )
+    .option(
+      "--generate-update-dto-to-entity",
+      "Generate update DTO to entity mapping functions",
+      true
+    )
+    .option(
+      "--generate-find-many-to-filter",
+      "Generate FindMany DTO to filter mapping functions",
+      true
+    )
+    .option("--parallel", "Enable parallel processing for faster generation", false)
+    .option(
+      "--concurrency <number>",
+      "Set the number of concurrent workers for parallel processing",
+      "4"
+    )
+    .option("--skip-config", "Skip loading configuration file")
+    .option("-c, --config <path>", "Path to a specific configuration file")
+    .action((options) => {
+      // Set default generators for update-mappings if none specified
+      if (!options.generateMapping &&
+          !options["generateCreateDtoToEntity"] &&
+          !options["generateUpdateDtoToEntity"] &&
+          !options["generateFindManyToFilter"]) {
+        options.generateMapping = true;
+        options["generateCreateDtoToEntity"] = true;
+        options["generateUpdateDtoToEntity"] = true;
+        options["generateFindManyToFilter"] = true;
+      }
+
+      const start = new Date();
       const shouldLoadConfig = !options.skipConfig;
+
       if (shouldLoadConfig) {
         loadConfiguration(options)
           .then((config) => {
-            return generateDtos(config!);
+            // Override generators to only include mapping-related ones
+            const mappingGenerators: GeneratorType[] = [];
+            if (options.generateMapping) mappingGenerators.push("entity-to-dto");
+            if (options["generateCreateDtoToEntity"]) mappingGenerators.push("create-dto-to-entity");
+            if (options["generateUpdateDtoToEntity"]) mappingGenerators.push("update-dto-to-entity");
+            if (options["generateFindManyToFilter"]) mappingGenerators.push("find-many-to-filter");
+
+            if (mappingGenerators.length > 0) {
+              config.generators = mappingGenerators;
+            }
+            return generateDtos(config);
           })
           .then(() => {
             const end = new Date();
@@ -543,12 +678,23 @@ if (require.main === module) {
             "Error: Please provide both input pattern and output paths."
           );
           console.error(
-            "Example: mikro-dto-generator --input 'src/entities/*.entity.ts' --output './dtos'"
+            "Example: mn-forge update-mappings --input 'src/entities/*.entity.ts' --output './mappings'"
           );
           process.exit(1);
         }
 
         const finalConfig = legacyToConfig(options as LegacyGeneratorOptions);
+        // Override generators to only include mapping-related ones
+        const mappingGenerators: GeneratorType[] = [];
+        if (options.generateMapping) mappingGenerators.push("entity-to-dto");
+        if (options["generateCreateDtoToEntity"]) mappingGenerators.push("create-dto-to-entity");
+        if (options["generateUpdateDtoToEntity"]) mappingGenerators.push("update-dto-to-entity");
+        if (options["generateFindManyToFilter"]) mappingGenerators.push("find-many-to-filter");
+
+        if (mappingGenerators.length > 0) {
+          finalConfig.generators = mappingGenerators;
+        }
+
         generateDtos(finalConfig)
           .then(() => {
             const end = new Date();
@@ -573,6 +719,22 @@ if (require.main === module) {
             process.exit(1);
           });
       }
-    }
-  }
+    });
+
+  // generate-scaffold subcommand (for resource generation)
+  program
+    .command("generate-scaffold")
+    .description("Generate NestJS resource scaffold from MikroORM entity")
+    .option("-e, --entity <path>", "Path to the entity file")
+    .option("--dir <path>", "Relative directory for output files (used if -e does not match template)")
+    .option("--generate-module", "Generate NestJS module", true)
+    .option("--generate-service", "Generate NestJS service", true)
+    .option("--generate-controller", "Generate NestJS controller", true)
+    .option("--force", "Overwrite existing files", false)
+    .action((options) => {
+      // Run the resource CLI with the provided options
+      runResourceCli(options.entity, options);
+    });
+
+  program.parse(process.argv);
 }

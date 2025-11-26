@@ -39,7 +39,7 @@ $ pnpm install
 $ pnpm --filter test-nest-app run generate
 ```
 
-该命令会调用本地 `mikro-dto-generator` 包，读取 `mikro-dto-generator.config.ts`，
+该命令会调用本地 `@mikro-nest-forge/mikro-nest-forge` 包，读取 `mikro-nest-forge.config.ts`，
 并基于 `src/entities` 下的 MikroORM 实体生成 DTO 到 `src/generated` 目录，用于模拟生产环境的使用方式。
 
 ## Compile and run the project
