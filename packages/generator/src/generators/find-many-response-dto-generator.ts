@@ -65,7 +65,7 @@ export function generateFindManyResponseDtoForEntity(
   outputPath: string,
   sourceFile: SourceFile,
   project: Project,
-  entityRegistry: EntityRegistry
+  entityRegistry?: EntityRegistry
 ): void {
   const generatedDir = path.join(outputPath, "generated");
   const entityDir = path.join(generatedDir, className.toLowerCase());

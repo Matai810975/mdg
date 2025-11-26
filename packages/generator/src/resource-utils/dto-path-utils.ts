@@ -1,17 +1,17 @@
 import * as path from 'path';
-import { DtoGeneratorConfig } from '../types/config.types';
+import { MikroNestForgeConfig } from '../types/config.types';
 
 /**
  * Get DTO import path relative to CRUD output directory
  */
 export function getDtoImportPath(
   entityFileName: string,
-  config: DtoGeneratorConfig,
+  config: MikroNestForgeConfig,
   entityFilePath?: string,
   crudOutputPath?: string
 ): string {
   // Get the DTO output directory from config
-  const dtoOutputDir = config.output || 'src/dtos';
+  const dtoOutputDir = config.mappingGeneratorOptions.outputDir || 'src/dtos';
 
   // If we know the entity file path and CRUD output path, calculate the relative path
   if (entityFilePath && crudOutputPath) {
@@ -36,7 +36,7 @@ export function getDtoImportPath(
  */
 export function getEntityDtoImports(
   entityFileName: string,
-  config: DtoGeneratorConfig,
+  config: MikroNestForgeConfig,
   entityFilePath?: string,
   crudOutputPath?: string
 ): {

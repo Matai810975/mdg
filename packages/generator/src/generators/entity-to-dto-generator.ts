@@ -2,7 +2,7 @@ import { Project, SourceFile, ClassDeclaration, PropertyDeclaration } from 'ts-m
 import path from 'path';
 import { shouldExcludePropertyForOperation } from "../utils/extract-dto-options";
 import { extractPrimaryKeyType } from "../utils/extract-primary-key-type";
-import { resolveRelationEntityType, resolveRelationEntityTypeOptimized } from "../utils/resolve-relation-entity-type";
+import { resolveRelationEntityTypeOptimized } from "../utils/resolve-relation-entity-type";
 import { createEntityRegistry, EntityRegistry } from "../utils/entity-registry";
 import { getAllPropertiesIncludingInherited } from "../utils/get-all-properties-including-inherited";
 import { extractEnumTypeFromDecorator } from "../utils/extract-enum-type";
@@ -178,14 +178,7 @@ function generateMappingFunction(
           const relationDecoratorName = relationDecorator.getName();
           let targetEntity: any = null;
 
-          // Use the optimized relation resolution with entity registry if available
-          if (entityRegistry) {
-            targetEntity = resolveRelationEntityTypeOptimized(relationDecorator, property, entityRegistry);
-          } else {
-            // Fallback to the original method if registry is not available
-            const sourceFiles = project.getSourceFiles(); // Get from project
-            targetEntity = resolveRelationEntityType(relationDecorator, property, sourceFiles);
-          }
+          targetEntity = resolveRelationEntityTypeOptimized(relationDecorator, property, entityRegistry!);
 
           if (targetEntity) {
             const primaryKeyType = extractPrimaryKeyType(targetEntity);

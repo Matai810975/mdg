@@ -126,7 +126,7 @@ export default config;
   - `basePath`: Base path for output files
   - `templates`: Template path patterns for generated files
 
-**Note:** The legacy `DtoGeneratorConfig` format is still supported in v2.0 but deprecated. See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for migration instructions.
+**Note:** As of v3.0, only the `MikroNestForgeConfig` format is supported. The legacy `DtoGeneratorConfig` format has been completely removed. See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for upgrade instructions.
 
 ### Entity-DTO Relationship
 

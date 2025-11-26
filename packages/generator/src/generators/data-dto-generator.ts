@@ -11,7 +11,7 @@ import {
   extractPrimaryKeyTypeWithValidation,
 } from "../utils/extract-primary-key-type";
 import { getPropertyDecoratorComment } from "../utils/get-property-decorator-comment";
-import { resolveRelationEntityType, resolveRelationEntityTypeOptimized } from "../utils/resolve-relation-entity-type";
+import { resolveRelationEntityTypeOptimized } from "../utils/resolve-relation-entity-type";
 import { createEntityRegistry, EntityRegistry } from "../utils/entity-registry";
 import { checkPropertyNullable } from "../utils/check-property-nullable";
 import { shouldExcludePropertyForOperation } from "../utils/extract-dto-options";
@@ -53,7 +53,7 @@ export function generateDtoFiles(config: DtoGeneratorConfig): void {
             config.outputPath,
             sourceFile,
             config.project,
-            entityRegistry
+            entityRegistry!
           );
         } catch (error) {
           // Log the error but continue processing other entities
@@ -78,7 +78,7 @@ export function generateDtoForEntity(
   outputPath: string,
   sourceFile: SourceFile,
   project: Project,
-  entityRegistry: EntityRegistry
+  entityRegistry?: EntityRegistry
 ): void {
   const generatedDir = path.join(outputPath, "generated");
   const entityDir = path.join(generatedDir, className.toLowerCase());
@@ -118,7 +118,7 @@ export function generateDtoForEntity(
       sourceFile,
       project,
       className,
-      entityRegistry
+      entityRegistry!
     );
   }
 
@@ -235,7 +235,7 @@ export function processProperty(
       dtoFilePath,
       project,
       entityClassName,
-      entityRegistry
+      entityRegistry!
     );
   }
 }
@@ -398,22 +398,11 @@ function processRelationProperty(
     const relationDecoratorName = relationDecorator.getName();
     let targetEntity: any = null;
 
-    // Use the optimized relation resolution with entity registry if available
-    if (entityRegistry) {
-      targetEntity = resolveRelationEntityTypeOptimized(
-        relationDecorator,
-        property,
-        entityRegistry
-      );
-    } else {
-      // Fallback to the original method if registry is not available
-      const sourceFiles = project.getSourceFiles(); // Get from project
-      targetEntity = resolveRelationEntityType(
-        relationDecorator,
-        property,
-        sourceFiles
-      );
-    }
+    targetEntity = resolveRelationEntityTypeOptimized(
+      relationDecorator,
+      property,
+      entityRegistry!
+    );
 
     if (targetEntity) {
       let primaryKeyType: string | null = null;

@@ -1,13 +1,13 @@
 import { EntityInfo } from '../resource-utils/entity-analyzer';
 import { TemplateUtils } from '../resource-utils/template-utils';
 import * as path from 'path';
-import { DtoGeneratorConfig } from '../types/config.types';
+import { MikroNestForgeConfig } from '../types/config.types';
 import { getEntityDtoImports } from '../resource-utils/dto-path-utils';
 
 /**
  * Generate NestJS module content for an entity using Handlebars template
  */
-export function generateModule(entityInfo: EntityInfo, dtoConfig: DtoGeneratorConfig | null, outputPath?: string): string {
+export function generateModule(entityInfo: EntityInfo, dtoConfig: MikroNestForgeConfig | null, outputPath?: string): string {
   const entityFileName = entityInfo.fileName;
 
   // Calculate the relative path to the entity file

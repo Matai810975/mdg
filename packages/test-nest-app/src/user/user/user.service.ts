@@ -2,15 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository, EntityManager } from '@mikro-orm/core';
 import { User } from '../../entities/User';
-import { UserDto } from '../../generated/mdg/generated/user/user.dto';
-import { UserCreateDto } from '../../generated/mdg/generated/user/user.create.dto';
-import { UserUpdateDto } from '../../generated/mdg/generated/user/user.update.dto';
-import { UserToDto } from '../../generated/mdg/generated/user/user.mapping';
-import { createUserFromDto } from '../../generated/mdg/generated/user/user.create.mapping';
-import { updateUserFromDto } from '../../generated/mdg/generated/user/user.update.mapping';
-import { UserFindManyDtoToFilter } from '../../generated/mdg/generated/user/user.find-many.mapping';
-import { UserFindManyDto } from '../../generated/mdg/generated/user/user.find-many.dto';
-import { UserFindManyResponseDto } from '../../generated/mdg/generated/user/user.find-many.response.dto';
+import { UserDto } from '../../generated/mikro-nest-forge/generated/user/user.dto';
+import { UserCreateDto } from '../../generated/mikro-nest-forge/generated/user/user.create.dto';
+import { UserUpdateDto } from '../../generated/mikro-nest-forge/generated/user/user.update.dto';
+import { UserToDto } from '../../generated/mikro-nest-forge/generated/user/user.mapping';
+import { createUserFromDto } from '../../generated/mikro-nest-forge/generated/user/user.create.mapping';
+import { updateUserFromDto } from '../../generated/mikro-nest-forge/generated/user/user.update.mapping';
+import { UserFindManyDtoToFilter } from '../../generated/mikro-nest-forge/generated/user/user.find-many.mapping';
+import { UserFindManyDto } from '../../generated/mikro-nest-forge/generated/user/user.find-many.dto';
+import { UserFindManyResponseDto } from '../../generated/mikro-nest-forge/generated/user/user.find-many.response.dto';
 
 @Injectable()
 export class UserService {

@@ -1,8 +1,8 @@
 import { generateResource } from './resource-generators/resource-generator';
 import { analyzeEntity } from './resource-utils/entity-analyzer';
-import { findAndLoadLegacyConfig } from './shared-config/config-loader';
+import { findAndLoadConfig } from './shared-config/config-loader';
 import { parsePath, resolveOutputPath } from './resource-utils/path-resolver';
-import { DtoGeneratorConfig, defaultConfig } from './types/config.types';
+import { MikroNestForgeConfig } from './types/config.types';
 
 type CliOptions = {
   entity: string;
@@ -18,12 +18,12 @@ type CliOptions = {
  * Main function to generate Nestjs resource for a single entity
  */
 async function generateSingleEntityResource(
-  config: DtoGeneratorConfig,
+  config: MikroNestForgeConfig,
   options: CliOptions,
 ): Promise<void> {
   try {
     const { entity: entityPath, dir: dirPath } = options;
-    const entityTemplate = config.resources?.templates?.entity ?? defaultConfig.resources?.templates?.entity;
+    const entityTemplate = config.scaffoldGeneratorOptions.templates.entity;
 
     if (!entityTemplate) {
       throw new Error('Entity template is not defined in configuration');
@@ -39,16 +39,16 @@ async function generateSingleEntityResource(
     if (entityName !== entityInfo.name) {
         // console.warn(`⚠️  Warning: Entity file name '${entityName}' does not match class name '${entityInfo.name}'. Using class name '${entityInfo.name}'.`);
     }
-    
+
     // Use kebab-case for file naming to match NestJS convention
     const finalEntityName = entityInfo.name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 
 
     // 3. Resolve output paths for each file to be generated
-    const basePath = config.resources?.basePath ?? defaultConfig.resources?.basePath ?? process.cwd();
-    const controllerTemplate = config.resources?.templates?.controller ?? defaultConfig.resources?.templates?.controller;
-    const serviceTemplate = config.resources?.templates?.service ?? defaultConfig.resources?.templates?.service;
-    const moduleTemplate = config.resources?.templates?.module ?? defaultConfig.resources?.templates?.module;
+    const basePath = config.scaffoldGeneratorOptions.basePath;
+    const controllerTemplate = config.scaffoldGeneratorOptions.templates.controller;
+    const serviceTemplate = config.scaffoldGeneratorOptions.templates.service;
+    const moduleTemplate = config.scaffoldGeneratorOptions.templates.module;
 
     if (!controllerTemplate || !serviceTemplate || !moduleTemplate) {
         throw new Error('Resource templates are not fully defined in configuration');
@@ -92,7 +92,13 @@ async function runCli(entityPath: string, options: any): Promise<void> {
   };
 
   // Load configuration
-  const config = await findAndLoadLegacyConfig() || new DtoGeneratorConfig({ input: '', output: '' });
+  const config = await findAndLoadConfig();
+
+  if (!config) {
+    console.error("❌ No configuration file found.");
+    console.error("Please create a mikro-nest-forge.config.ts file.");
+    process.exit(1);
+  }
 
 
   console.log('🔍 Analyzing entity:', runOptions.entity);

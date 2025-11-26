@@ -106,7 +106,7 @@ export function resolveRelationEntityTypeWithRegistry(
 /**
  * Infer entity type from property type annotation using the entity registry
  */
-function inferEntityTypeFromPropertyTypeWithRegistry(
+export function inferEntityTypeFromPropertyTypeWithRegistry(
   property: any, // PropertyDeclaration type
   registry: EntityRegistry
 ): ClassDeclaration | null {

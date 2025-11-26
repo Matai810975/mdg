@@ -1,13 +1,13 @@
 import { EntityInfo } from '../resource-utils/entity-analyzer';
 import { TemplateUtils } from '../resource-utils/template-utils';
 import * as path from 'path';
-import { DtoGeneratorConfig } from '../types/config.types';
+import { MikroNestForgeConfig } from '../types/config.types';
 import { getEntityDtoImports } from '../resource-utils/dto-path-utils';
 
 /**
  * Generate NestJS controller content for an entity using Handlebars template
  */
-export function generateController(entityInfo: EntityInfo, dtoConfig: DtoGeneratorConfig | null, outputPath?: string): string {
+export function generateController(entityInfo: EntityInfo, dtoConfig: MikroNestForgeConfig | null, outputPath?: string): string {
   const entityName = entityInfo.name;
   const entityFileName = entityInfo.fileName;
   const entityFileNameKebab = entityFileName.toLowerCase();

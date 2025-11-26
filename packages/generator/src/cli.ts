@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { program } from "commander";
-import { runInteractiveMode } from "./interactive-cli";
 import { Project } from "ts-morph";
 import fs from "fs";
 import path from "path";
@@ -17,67 +16,41 @@ import { generateDtosInParallel } from "./parallel-dto-generator";
 import { DtoGeneratorError } from "./errors/DtoGeneratorError";
 import { logError } from "./errors/error-utils";
 import {
-  DtoGeneratorConfig,
-  LegacyGeneratorOptions,
+  MikroNestForgeConfig,
   GeneratorType,
-  legacyToConfig,
 } from "./types/config.types";
-import { loadAndMergeConfig } from "./shared-config/config-merger";
-import { loadLegacyConfigFile } from "./shared-config/config-loader";
-import { validateConfig } from "./shared-config/config-validator";
+import { loadConfigFile, findAndLoadConfig } from "./shared-config/config-loader";
+import { validateNewConfig } from "./shared-config/config-validator";
 import { runCli as runResourceCli } from "./resource-cli"; // Import the resource CLI
 
 /**
  * Load configuration with support for specific config file path
  */
-async function loadConfiguration(options: any): Promise<DtoGeneratorConfig> {
-  let config: DtoGeneratorConfig | null = null;
+async function loadConfiguration(options: any): Promise<MikroNestForgeConfig> {
+  let config: MikroNestForgeConfig | null = null;
 
   if (options.config) {
     // Load specific configuration file
-    config = await loadLegacyConfigFile(options.config);
+    config = await loadConfigFile(options.config);
     console.log(`✓ Loaded configuration from: ${options.config}`);
   } else {
     // Auto-detect configuration file
-    config = await loadAndMergeConfig(options as LegacyGeneratorOptions);
+    config = await findAndLoadConfig();
     if (config) {
-      console.log("✓ Using configuration file as defaults");
+      console.log("✓ Using configuration file");
     }
   }
 
   if (!config) {
-    console.log("⚠️  No configuration file found, using CLI options only");
+    console.log("⚠️  No configuration file found");
     console.log(
-      "💡 Create a mikro-dto-generator.config.ts file for default settings"
+      "💡 Create a mikro-nest-forge.config.ts file with your settings"
     );
-
-    // Validate required options
-    if (!options.input || !options.output) {
-      console.error(
-        "Error: Please provide both input pattern and output paths."
-      );
-      console.error(
-        "Example: mikro-dto-generator --input 'src/entities/*.entity.ts' --output './dtos'"
-      );
-      console.error(
-        "Or create a mikro-dto-generator.config.ts file with default settings."
-      );
-      process.exit(1);
-    }
-    config = legacyToConfig(options as LegacyGeneratorOptions);
-  }
-
-  // Show what CLI options are overriding
-  if (options.config && config) {
-    const overrides = [];
-    if (options.input && options.input !== config.input)
-      overrides.push(`input: ${config.input} → ${options.input}`);
-    if (options.output && options.output !== config.output)
-      overrides.push(`output: ${config.output} → ${options.output}`);
-
-    if (overrides.length > 0) {
-      console.log("✓ CLI option overrides:", overrides.join(", "));
-    }
+    console.error("Error: Configuration file is required.");
+    console.error(
+      "Please create a mikro-nest-forge.config.ts file in your project root."
+    );
+    process.exit(1);
   }
 
   return config;
@@ -91,11 +64,11 @@ async function validateConfigMode(configPath?: string): Promise<void> {
     let config;
 
     if (configPath) {
-      config = await loadLegacyConfigFile(configPath);
+      config = await loadConfigFile(configPath);
       console.log(`✓ Loaded configuration from: ${configPath}`);
     } else {
-      const { findAndLoadLegacyConfig } = await import("./shared-config/config-loader");
-      config = await findAndLoadLegacyConfig();
+      const { findAndLoadConfig } = await import("./shared-config/config-loader");
+      config = await findAndLoadConfig();
       if (!config) {
         console.error("❌ No configuration file found");
         process.exit(1);
@@ -103,17 +76,17 @@ async function validateConfigMode(configPath?: string): Promise<void> {
       console.log("✓ Found and loaded configuration file");
     }
 
-    validateConfig(config);
+    validateNewConfig(config);
     console.log("✅ Configuration is valid!");
 
     console.log("");
     console.log("📋 Configuration Summary:");
-    console.log(`  Input: ${config.input}`);
-    console.log(`  Output: ${config.output}`);
-    console.log(`  Generators: ${config.generators.join(", ")}`);
-    if (config.parallel) {
+    console.log(`  Input: ${config.mappingGeneratorOptions.entitiesGlob}`);
+    console.log(`  Output: ${config.mappingGeneratorOptions.outputDir}`);
+    console.log(`  Generators: ${config.mappingGeneratorOptions.generators.join(", ")}`);
+    if (config.mappingGeneratorOptions.performance.enabled) {
       console.log(
-        `  Parallel: enabled (concurrency: ${config.concurrency || 4})`
+        `  Parallel: enabled (concurrency: ${config.mappingGeneratorOptions.performance.workerCount})`
       );
     } else {
       console.log(`  Parallel: disabled`);
@@ -129,8 +102,11 @@ async function validateConfigMode(configPath?: string): Promise<void> {
  * Main function that can be imported as a module
  * @param options Generator options
  */
-export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
-  if (!options.input || !options.output) {
+export async function generateDtos(options: MikroNestForgeConfig): Promise<void> {
+  const input = options.mappingGeneratorOptions.entitiesGlob;
+  const output = options.mappingGeneratorOptions.outputDir;
+
+  if (!input || !output) {
     throw new Error(
       "Error: Please provide both input pattern and output paths."
     );
@@ -144,7 +120,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
     // Support different entity file selection patterns
     // If the input already contains a glob pattern, use it directly
     // Otherwise, default to the original behavior
-    const entityPattern = options.input;
+    const entityPattern = input;
 
     project.addSourceFilesAtPaths(entityPattern);
 
@@ -199,32 +175,32 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
 
     // Check if we should use parallel processing
     const shouldUseParallel =
-      options.parallel &&
-      options.generators.some((gen) =>
+      options.mappingGeneratorOptions.performance.enabled &&
+      options.mappingGeneratorOptions.generators.some((gen) =>
         ["dto", "create-dto", "update-dto", "find-many-dto"].includes(gen)
       );
 
     if (shouldUseParallel) {
       const parallelOptions = {
-        generateDto: options.generators.includes("dto"),
-        generateCreateDto: options.generators.includes("create-dto"),
-        generateUpdateDto: options.generators.includes("update-dto"),
-        generateFindManyDto: options.generators.includes("find-many-dto"),
-        concurrencyLimit: options.concurrency,
+        generateDto: options.mappingGeneratorOptions.generators.includes("dto"),
+        generateCreateDto: options.mappingGeneratorOptions.generators.includes("create-dto"),
+        generateUpdateDto: options.mappingGeneratorOptions.generators.includes("update-dto"),
+        generateFindManyDto: options.mappingGeneratorOptions.generators.includes("find-many-dto"),
+        concurrencyLimit: options.mappingGeneratorOptions.performance.workerCount,
       };
 
       await generateDtosInParallel(
         {
           project,
           sourceFiles,
-          outputPath: options.output,
+          outputPath: output,
         },
         parallelOptions
       );
     }
 
     // Process each generator type
-    for (const generator of options.generators) {
+    for (const generator of options.mappingGeneratorOptions.generators) {
       try {
         switch (generator) {
           case "dto":
@@ -232,7 +208,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
               generateDtoFiles({
                 project,
                 sourceFiles,
-                outputPath: options.output,
+                outputPath: output,
               });
             }
             break;
@@ -242,7 +218,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
               generateCreateDtoFiles({
                 project,
                 sourceFiles,
-                outputPath: options.output,
+                outputPath: output,
               });
             }
             break;
@@ -252,7 +228,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
               generateUpdateDtoFiles({
                 project,
                 sourceFiles,
-                outputPath: options.output,
+                outputPath: output,
               });
             }
             break;
@@ -262,7 +238,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
               generateFindManyDtoFiles({
                 project,
                 sourceFiles,
-                outputPath: options.output,
+                outputPath: output,
               });
             }
             break;
@@ -271,7 +247,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
             generateFindManyResponseDtoFiles({
               project,
               sourceFiles,
-              outputPath: options.output,
+              outputPath: output,
             });
             break;
 
@@ -279,7 +255,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
             generateFindManyToFilterMappingFiles({
               project,
               sourceFiles,
-              outputPath: options.output,
+              outputPath: output,
             });
             break;
 
@@ -287,7 +263,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
             generateMappingFiles({
               project,
               sourceFiles,
-              outputPath: options.output,
+              outputPath: output,
             });
             break;
 
@@ -295,7 +271,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
             generateCreateDtoToEntityMappingFiles({
               project,
               sourceFiles,
-              outputPath: options.output,
+              outputPath: output,
             });
             break;
 
@@ -303,7 +279,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
             generateUpdateDtoToEntityMappingFiles({
               project,
               sourceFiles,
-              outputPath: options.output,
+              outputPath: output,
             });
             break;
 
@@ -318,7 +294,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
         if (error instanceof DtoGeneratorError) {
           logError(error, {
             operation: `generate-${generator}`,
-            filePath: options.output,
+            filePath: output,
           });
           throw error;
         }
@@ -327,7 +303,7 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
     }
 
     // Copy the to-copy directory contents to the output directory only if any DTO generators are enabled
-    const hasDtoGenerators = options.generators.some((gen) =>
+    const hasDtoGenerators = options.mappingGeneratorOptions.generators.some((gen) =>
       [
         "dto",
         "create-dto",
@@ -340,12 +316,12 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
 
     if (hasDtoGenerators) {
       try {
-        copyToCopyDirectory(options.output);
+        copyToCopyDirectory(output);
       } catch (error) {
         if (error instanceof DtoGeneratorError) {
           logError(error, {
             operation: "copy-to-copy-directory",
-            filePath: options.output,
+            filePath: output,
           });
           throw error;
         }
@@ -356,28 +332,28 @@ export async function generateDtos(options: DtoGeneratorConfig): Promise<void> {
     await project.save();
   } catch (error) {
     if (error instanceof DtoGeneratorError) {
-      logError(error, { operation: "generate-dtos", filePath: options.output });
+      logError(error, { operation: "generate-dtos", filePath: output });
       throw error;
     } else if (error instanceof Error) {
       const wrappedError = new DtoGeneratorError(
         `Unexpected error during DTO generation: ${error.message}`,
         "UNEXPECTED_ERROR",
-        { operation: "generate-dtos", filePath: options.output }
+        { operation: "generate-dtos", filePath: output }
       );
       logError(wrappedError, {
         operation: "generate-dtos",
-        filePath: options.output,
+        filePath: output,
       });
       throw wrappedError;
     } else {
       const wrappedError = new DtoGeneratorError(
         `Unexpected error during DTO generation: ${String(error)}`,
         "UNEXPECTED_ERROR",
-        { operation: "generate-dtos", filePath: options.output }
+        { operation: "generate-dtos", filePath: output }
       );
       logError(wrappedError, {
         operation: "generate-dtos",
-        filePath: options.output,
+        filePath: output,
       });
       throw wrappedError;
     }
@@ -483,12 +459,6 @@ if (require.main === module) {
       "Set the number of concurrent workers for parallel processing",
       "4"
     )
-    .option(
-      "--interactive",
-      "Run in interactive mode with guided prompts",
-      false
-    )
-    .option("--skip-config", "Skip loading configuration file")
     .option("-c, --config <path>", "Path to a specific configuration file")
     .option(
       "--validate",
@@ -504,83 +474,33 @@ if (require.main === module) {
           process.exit(1);
         });
       } else {
-        // Check if interactive mode is requested
-        if (options.interactive) {
-          runInteractiveMode().catch((error) => {
-            console.error("Interactive mode failed:", error);
+        // Load configuration file
+        loadConfiguration(options)
+          .then((config) => {
+            return generateDtos(config);
+          })
+          .then(() => {
+            const end = new Date();
+            console.log(
+              `start:${start},end:${end},total:${
+                end.getTime() - start.getTime()
+              }`
+            );
+          })
+          .catch((error) => {
+            if (error instanceof DtoGeneratorError) {
+              // Error already logged by generateDtos function
+              console.error(`\n[ERROR] ${error.message}`);
+              if (error.context && Object.keys(error.context).length > 0) {
+                console.error(
+                  `Context: ${JSON.stringify(error.context, null, 2)}`
+                );
+              }
+            } else {
+              console.error(`\n[ERROR] ${error.message || error}`);
+            }
             process.exit(1);
           });
-        } else {
-          // Load configuration file as default (unless explicitly disabled)
-          const shouldLoadConfig = !options.skipConfig;
-          if (shouldLoadConfig) {
-            loadConfiguration(options)
-              .then((config) => {
-                return generateDtos(config);
-              })
-              .then(() => {
-                const end = new Date();
-                console.log(
-                  `start:${start},end:${end},total:${
-                    end.getTime() - start.getTime()
-                  }`
-                );
-              })
-              .catch((error) => {
-                if (error instanceof DtoGeneratorError) {
-                  // Error already logged by generateDtos function
-                  console.error(`\n[ERROR] ${error.message}`);
-                  if (error.context && Object.keys(error.context).length > 0) {
-                    console.error(
-                      `Context: ${JSON.stringify(error.context, null, 2)}`
-                    );
-                  }
-                } else {
-                  console.error(`\n[ERROR] ${error.message || error}`);
-                }
-                process.exit(1);
-              });
-          } else {
-            // Skip config loading, use CLI options only
-            console.log("⚠️  Skipping configuration file loading");
-
-            // Validate required options
-            if (!options.input || !options.output) {
-              console.error(
-                "Error: Please provide both input pattern and output paths."
-              );
-              console.error(
-                "Example: mn-forge generate-dto --input 'src/entities/*.entity.ts' --output './dtos'"
-              );
-              process.exit(1);
-            }
-
-            const finalConfig = legacyToConfig(options as LegacyGeneratorOptions);
-            generateDtos(finalConfig)
-              .then(() => {
-                const end = new Date();
-                console.log(
-                  `start:${start},end:${end},total:${
-                    end.getTime() - start.getTime()
-                  }`
-                );
-              })
-              .catch((error) => {
-                if (error instanceof DtoGeneratorError) {
-                  // Error already logged by generateDtos function
-                  console.error(`\n[ERROR] ${error.message}`);
-                  if (error.context && Object.keys(error.context).length > 0) {
-                    console.error(
-                      `Context: ${JSON.stringify(error.context, null, 2)}`
-                    );
-                  }
-                } else {
-                  console.error(`\n[ERROR] ${error.message || error}`);
-                }
-                process.exit(1);
-              });
-          }
-        }
       }
     });
 
@@ -615,7 +535,6 @@ if (require.main === module) {
       "Set the number of concurrent workers for parallel processing",
       "4"
     )
-    .option("--skip-config", "Skip loading configuration file")
     .option("-c, --config <path>", "Path to a specific configuration file")
     .action((options) => {
       // Set default generators for update-mappings if none specified
@@ -630,96 +549,43 @@ if (require.main === module) {
       }
 
       const start = new Date();
-      const shouldLoadConfig = !options.skipConfig;
 
-      if (shouldLoadConfig) {
-        loadConfiguration(options)
-          .then((config) => {
-            // Override generators to only include mapping-related ones
-            const mappingGenerators: GeneratorType[] = [];
-            if (options.generateMapping) mappingGenerators.push("entity-to-dto");
-            if (options["generateCreateDtoToEntity"]) mappingGenerators.push("create-dto-to-entity");
-            if (options["generateUpdateDtoToEntity"]) mappingGenerators.push("update-dto-to-entity");
-            if (options["generateFindManyToFilter"]) mappingGenerators.push("find-many-to-filter");
+      loadConfiguration(options)
+        .then((config) => {
+          // Override generators to only include mapping-related ones
+          const mappingGenerators: GeneratorType[] = [];
+          if (options.generateMapping) mappingGenerators.push("entity-to-dto");
+          if (options["generateCreateDtoToEntity"]) mappingGenerators.push("create-dto-to-entity");
+          if (options["generateUpdateDtoToEntity"]) mappingGenerators.push("update-dto-to-entity");
+          if (options["generateFindManyToFilter"]) mappingGenerators.push("find-many-to-filter");
 
-            if (mappingGenerators.length > 0) {
-              config.generators = mappingGenerators;
-            }
-            return generateDtos(config);
-          })
-          .then(() => {
-            const end = new Date();
-            console.log(
-              `start:${start},end:${end},total:${
-                end.getTime() - start.getTime()
-              }`
-            );
-          })
-          .catch((error) => {
-            if (error instanceof DtoGeneratorError) {
-              // Error already logged by generateDtos function
-              console.error(`\n[ERROR] ${error.message}`);
-              if (error.context && Object.keys(error.context).length > 0) {
-                console.error(
-                  `Context: ${JSON.stringify(error.context, null, 2)}`
-                );
-              }
-            } else {
-              console.error(`\n[ERROR] ${error.message || error}`);
-            }
-            process.exit(1);
-          });
-      } else {
-        // Skip config loading, use CLI options only
-        console.log("⚠️  Skipping configuration file loading");
-
-        // Validate required options
-        if (!options.input || !options.output) {
-          console.error(
-            "Error: Please provide both input pattern and output paths."
+          if (mappingGenerators.length > 0) {
+            config.mappingGeneratorOptions.generators = mappingGenerators;
+          }
+          return generateDtos(config);
+        })
+        .then(() => {
+          const end = new Date();
+          console.log(
+            `start:${start},end:${end},total:${
+              end.getTime() - start.getTime()
+            }`
           );
-          console.error(
-            "Example: mn-forge update-mappings --input 'src/entities/*.entity.ts' --output './mappings'"
-          );
+        })
+        .catch((error) => {
+          if (error instanceof DtoGeneratorError) {
+            // Error already logged by generateDtos function
+            console.error(`\n[ERROR] ${error.message}`);
+            if (error.context && Object.keys(error.context).length > 0) {
+              console.error(
+                `Context: ${JSON.stringify(error.context, null, 2)}`
+              );
+            }
+          } else {
+            console.error(`\n[ERROR] ${error.message || error}`);
+          }
           process.exit(1);
-        }
-
-        const finalConfig = legacyToConfig(options as LegacyGeneratorOptions);
-        // Override generators to only include mapping-related ones
-        const mappingGenerators: GeneratorType[] = [];
-        if (options.generateMapping) mappingGenerators.push("entity-to-dto");
-        if (options["generateCreateDtoToEntity"]) mappingGenerators.push("create-dto-to-entity");
-        if (options["generateUpdateDtoToEntity"]) mappingGenerators.push("update-dto-to-entity");
-        if (options["generateFindManyToFilter"]) mappingGenerators.push("find-many-to-filter");
-
-        if (mappingGenerators.length > 0) {
-          finalConfig.generators = mappingGenerators;
-        }
-
-        generateDtos(finalConfig)
-          .then(() => {
-            const end = new Date();
-            console.log(
-              `start:${start},end:${end},total:${
-                end.getTime() - start.getTime()
-              }`
-            );
-          })
-          .catch((error) => {
-            if (error instanceof DtoGeneratorError) {
-              // Error already logged by generateDtos function
-              console.error(`\n[ERROR] ${error.message}`);
-              if (error.context && Object.keys(error.context).length > 0) {
-                console.error(
-                  `Context: ${JSON.stringify(error.context, null, 2)}`
-                );
-              }
-            } else {
-              console.error(`\n[ERROR] ${error.message || error}`);
-            }
-            process.exit(1);
-          });
-      }
+        });
     });
 
   // generate-scaffold subcommand (for resource generation)

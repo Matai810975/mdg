@@ -1,8 +1,18 @@
-# MikroNestForge v2.0 Migration Guide
+# MikroNestForge v3.0 Migration Guide
 
 ## Overview
 
-Version 2.0 introduces a new, clearer configuration structure that better reflects the tool's dual purposes: **mapping generation** (DTOs and their conversion functions) and **scaffold generation** (NestJS resource boilerplate).
+Version 3.0 is a **major breaking release** that completely removes support for the legacy configuration format. All deprecated APIs, types, and backward compatibility layers have been removed.
+
+**Key Changes:**
+- ✅ Simplified codebase with only `MikroNestForgeConfig` support
+- ❌ Removed `DtoGeneratorConfig` and all legacy types
+- ❌ Removed interactive CLI mode
+- ❌ Removed command-line-only configuration (config file is now required)
+- ⚡ Improved performance with optimized entity resolution
+- 🔒 Stronger type safety
+
+If you're currently using v1.x (legacy `DtoGeneratorConfig`), you must migrate to the v2.0+ format before upgrading to v3.0.
 
 ## What's Changed?
 
@@ -150,23 +160,31 @@ validateNewConfig(config);
 ### 4. **Easier to Extend**
 The new structure makes it easier to add new options in the future without cluttering the root configuration object.
 
-## Backward Compatibility
+## Removed Features in v3.0
 
-### Automatic Detection and Conversion
+### Legacy Configuration Support
 
-MikroNestForge v2.0 automatically detects which config format you're using:
+The legacy `DtoGeneratorConfig` format is **completely removed** in v3.0. Your configuration **must** use the new `MikroNestForgeConfig` format.
 
-- **New Format**: Loads without warnings, uses new validation
-- **Legacy Format**: Loads with a deprecation warning, automatically converts to new format internally
+**Removed Types:**
+- `DtoGeneratorConfig` - Use `MikroNestForgeConfig` instead
+- `ResourceGeneratorConfig` - Use `ScaffoldGeneratorOptions` instead
+- `IDtoGeneratorConfig` - No longer needed
+- `validateConfig()` - Use `validateNewConfig()` instead
 
-### Deprecation Timeline
+### Interactive CLI Mode
 
-| Version | Legacy Format Support |
-|---------|----------------------|
-| v2.0.x  | ✅ Fully supported with deprecation warnings |
-| v3.0.0  | ❌ Removed - must use new format |
+The interactive mode (`--interactive` flag) has been removed. You must create a configuration file.
 
-You have until v3.0.0 to migrate to the new format.
+### CLI-Only Usage
+
+v3.0 **requires** a configuration file (`mikro-nest-forge.config.ts`). Running commands without a config file is no longer supported.
+
+### Deprecated Utility Functions
+
+Internal deprecated functions have been removed for better performance:
+- Old relation resolution functions replaced with optimized versions
+- Removed backward compatibility conversion functions
 
 ## Configuration Reference
 
@@ -246,25 +264,38 @@ class ScaffoldTemplatesConfig {
 
 ## Troubleshooting
 
-### Error: "Configuration field 'input' is required"
+### Error: Module has no exported member 'DtoGeneratorConfig'
 
-You're likely using the legacy `DtoGeneratorConfig` class. Update to `MikroNestForgeConfig` and use `mappingGeneratorOptions.entitiesGlob` instead of `input`.
-
-### Warning: "You are using the legacy DtoGeneratorConfig format"
-
-Your config file is using the old format. While it still works in v2.0, you should migrate to the new format before v3.0.0. See the migration steps above.
-
-### TypeScript Errors After Migration
-
-Make sure you've updated your imports:
+This is expected in v3.0. The legacy types have been removed. Update your configuration to use `MikroNestForgeConfig`:
 
 ```typescript
-// Update this
+// ❌ This no longer works
 import { DtoGeneratorConfig } from "@mikro-nest-forge/mikro-nest-forge";
 
-// To this
+// ✅ Use this instead
 import { MikroNestForgeConfig } from "@mikro-nest-forge/mikro-nest-forge";
 ```
+
+### Error: "No configuration file found"
+
+v3.0 requires a configuration file. Create a `mikro-nest-forge.config.ts` file in your project root with the new format.
+
+### TypeScript Errors in Existing Code
+
+If you have code that imports or uses the legacy types:
+
+1. Replace all `DtoGeneratorConfig` with `MikroNestForgeConfig`
+2. Update property accesses:
+   - `config.input` → `config.mappingGeneratorOptions.entitiesGlob`
+   - `config.output` → `config.mappingGeneratorOptions.outputDir`
+   - `config.parallel` → `config.mappingGeneratorOptions.performance.enabled`
+   - `config.concurrency` → `config.mappingGeneratorOptions.performance.workerCount`
+
+### Build Errors After Upgrading
+
+1. Delete `node_modules` and reinstall dependencies
+2. Clear TypeScript cache: `rm -rf dist`
+3. Rebuild: `pnpm build`
 
 ## Need Help?
 
@@ -276,9 +307,11 @@ If you encounter issues during migration:
 
 ## Summary
 
-The v2.0 configuration structure is designed to be:
+The v3.0 release represents a major cleanup:
+- **Simplified**: Only one configuration format to learn and maintain
+- **Faster**: Removed legacy conversion overhead and optimized entity resolution
+- **Type-Safe**: Stronger TypeScript guarantees without legacy compatibility
 - **Clearer**: Obvious separation between mapping and scaffold settings
-- **More Maintainable**: Easier to add new features without breaking changes
-- **Self-Documenting**: Property names clearly indicate their purpose
+- **Future-Proof**: Clean foundation for future enhancements
 
-While the legacy format continues to work in v2.0, we recommend migrating soon to take advantage of better validation and to prepare for v3.0.
+**Migration is mandatory** for v3.0. If you haven't migrated from the legacy format yet, you must do so before upgrading.

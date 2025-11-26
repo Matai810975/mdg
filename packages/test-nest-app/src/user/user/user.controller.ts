@@ -1,11 +1,11 @@
 import { Controller, Get, Post, Body, Param, NotFoundException } from '@nestjs/common';
 import { ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UserService } from './user.service';
-import { UserDto } from '../../generated/mdg/generated/user/user.dto';
-import { UserCreateDto } from '../../generated/mdg/generated/user/user.create.dto';
-import { UserUpdateDto } from '../../generated/mdg/generated/user/user.update.dto';
-import { UserFindManyDto } from '../../generated/mdg/generated/user/user.find-many.dto';
-import { UserFindManyResponseDto } from '../../generated/mdg/generated/user/user.find-many.response.dto';
+import { UserDto } from '../../generated/mikro-nest-forge/generated/user/user.dto';
+import { UserCreateDto } from '../../generated/mikro-nest-forge/generated/user/user.create.dto';
+import { UserUpdateDto } from '../../generated/mikro-nest-forge/generated/user/user.update.dto';
+import { UserFindManyDto } from '../../generated/mikro-nest-forge/generated/user/user.find-many.dto';
+import { UserFindManyResponseDto } from '../../generated/mikro-nest-forge/generated/user/user.find-many.response.dto';
 
 @Controller('user')
 export class UserController {
