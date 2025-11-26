@@ -125,11 +125,15 @@ export async function loadConfigFile(
       console.log('✓ Loaded DTO configuration (new format)');
 
       if (returnLegacyFormat) {
-        // Convert to legacy format for backward compatibility
+        // Validate new format first, then convert to legacy format for backward compatibility
+        const { validateNewConfig } = require('./config-validator');
         const { newToLegacyConfig } = require('../types/config.types');
+        validateNewConfig(config as MikroNestForgeConfig);
         return validateAndApplyDefaults(newToLegacyConfig(config) as Partial<DtoGeneratorConfig>);
       } else {
-        // Return new format as-is (validation will be added in Phase 4)
+        // Validate and return new format
+        const { validateNewConfig } = require('./config-validator');
+        validateNewConfig(config as MikroNestForgeConfig);
         return config as MikroNestForgeConfig;
       }
     } else {

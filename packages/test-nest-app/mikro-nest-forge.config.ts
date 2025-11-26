@@ -1,22 +1,26 @@
-import { DtoGeneratorConfig } from "@mikro-nest-forge/mikro-nest-forge";
+import { MikroNestForgeConfig } from "@mikro-nest-forge/mikro-nest-forge";
 
-const config = new DtoGeneratorConfig({
-  input: "src/entities/**/*.ts",
-  output: "src/generated/mikro-nest-forge",
-  generators: [
-    "dto",
-    "create-dto",
-    "update-dto",
-    "find-many-dto",
-    "find-many-response-dto",
-    "find-many-to-filter",
-    "entity-to-dto",
-    "create-dto-to-entity",
-    "update-dto-to-entity"
-  ],
-  parallel: true,
-  concurrency: 4,
-  resources: {
+const config = new MikroNestForgeConfig({
+  mappingGeneratorOptions: {
+    entitiesGlob: "src/entities/**/*.ts",
+    outputDir: "src/generated/mikro-nest-forge",
+    generators: [
+      "dto",
+      "create-dto",
+      "update-dto",
+      "find-many-dto",
+      "find-many-response-dto",
+      "find-many-to-filter",
+      "entity-to-dto",
+      "create-dto-to-entity",
+      "update-dto-to-entity"
+    ],
+    performance: {
+      enabled: true,
+      workerCount: 4
+    }
+  },
+  scaffoldGeneratorOptions: {
     basePath: "src",
     templates: {
       entity: "entities/{dir}/{entity}.ts",
@@ -28,4 +32,3 @@ const config = new DtoGeneratorConfig({
 });
 
 export default config;
-

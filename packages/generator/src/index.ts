@@ -10,6 +10,14 @@ export {
   newToLegacyConfig,
 } from "./types/config.types";
 
+// Configuration validation
+export {
+  validateNewConfig,
+  /** @deprecated Use validateNewConfig instead */
+  validateConfig,
+  validateAndApplyDefaults,
+} from "./shared-config/config-validator";
+
 // Legacy configuration (deprecated, will be removed in v3.0.0)
 export {
   /** @deprecated Use MikroNestForgeConfig instead */

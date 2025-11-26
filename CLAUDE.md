@@ -68,16 +68,65 @@ Configuration files are auto-detected in this priority order:
 3. `.mikro-nest-forge.config.ts`
 4. `.mikro-nest-forge.config.js`
 
-Example configuration structure:
+#### New Configuration Structure (v2.0+)
+
+The configuration is organized into two main sections:
+
 ```typescript
-interface DtoGeneratorConfig {
-  input: string;           // Input pattern for entity files
-  output: string;          // Output directory
-  generators?: GeneratorType[]; // Array of generators to run (default: all)
-  parallel?: boolean;      // Enable parallel processing (default: true)
-  concurrency?: number;    // Worker concurrency limit (default: 4)
-}
+import { MikroNestForgeConfig } from "@mikro-nest-forge/mikro-nest-forge";
+
+const config = new MikroNestForgeConfig({
+  // Settings for DTO and mapping function generation
+  mappingGeneratorOptions: {
+    entitiesGlob: "src/entities/**/*.ts",     // Glob pattern for entity files
+    outputDir: "src/generated/mikro-nest-forge", // Output directory
+    generators: [                             // Generators to run
+      "dto", "create-dto", "update-dto",
+      "find-many-dto", "find-many-response-dto",
+      "entity-to-dto", "create-dto-to-entity",
+      "update-dto-to-entity", "find-many-to-filter"
+    ],
+    performance: {
+      enabled: true,      // Enable parallel processing
+      workerCount: 4      // Number of concurrent workers
+    }
+  },
+  // Settings for resource scaffolding
+  scaffoldGeneratorOptions: {
+    basePath: "src",
+    templates: {
+      entity: "entities/{dir}/{entity}.ts",
+      controller: "user/{dir}/{entity}/{entity}.controller.ts",
+      service: "user/{dir}/{entity}/{entity}.service.ts",
+      module: "user/{dir}/{entity}/{entity}.module.ts"
+    }
+  }
+});
+
+export default config;
 ```
+
+**Key Configuration Classes:**
+
+- **`MikroNestForgeConfig`**: Root configuration
+  - `mappingGeneratorOptions`: Settings for `generate-dto` and `update-mappings` commands
+  - `scaffoldGeneratorOptions`: Settings for `generate-scaffold` command
+
+- **`MappingGeneratorOptions`**: DTO and mapping generation settings
+  - `entitiesGlob`: Glob pattern for entity files
+  - `outputDir`: Output directory for generated files
+  - `generators`: Array of generator types to run
+  - `performance`: Parallelization settings
+
+- **`PerformanceConfig`**: Performance settings
+  - `enabled`: Enable/disable parallel processing
+  - `workerCount`: Number of concurrent workers
+
+- **`ScaffoldGeneratorOptions`**: Resource scaffolding settings
+  - `basePath`: Base path for output files
+  - `templates`: Template path patterns for generated files
+
+**Note:** The legacy `DtoGeneratorConfig` format is still supported in v2.0 but deprecated. See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for migration instructions.
 
 ### Entity-DTO Relationship
 
